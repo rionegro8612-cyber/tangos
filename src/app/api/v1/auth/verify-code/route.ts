@@ -1,36 +1,33 @@
-// ❌ export default 금지! 오직 아래 Named export만 있어야 함
+import { NextResponse } from "next/server";
+import { verifyCode } from "@/server/auth/sms/service";
+import { signJwt, setSessionCookie } from "@/server/auth";
+export const runtime = "nodejs"; export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
-    try {
-      const { phone, code } = await req.json();
-      if (!phone || !code) {
-        return Response.json(
-          { success: false, code: "MISSING_PARAMS", message: "phone과 code를 모두 보내세요" },
-          { status: 400 }
-        );
-      }
-  
-      if (code === "123456") {
-        return Response.json({
-          success: true,
-          code: "OK",
-          data: {
-            accessToken: "demo-access-token",
-            refreshToken: "demo-refresh-token",
-            userId: "user_demo_1",
-          },
-          requestId: crypto.randomUUID(),
-        });
-      }
-  
-      return Response.json(
-        { success: false, code: "INVALID_CODE", message: "인증번호가 올바르지 않습니다" },
-        { status: 401 }
-      );
-    } catch {
-      return Response.json(
-        { success: false, code: "INVALID_BODY", message: "요청 본문이 올바른 JSON이 아닙니다" },
-        { status: 400 }
-      );
+  const requestId = crypto.randomUUID();
+  try {
+    const { phone, code, purpose = "login" } = await req.json();
+    if (!phone || !code) return NextResponse.json({ success:false, code:"VALIDATION_ERROR", message:"phone and code are required", data:null, requestId }, { status:400 });
+
+    const r = await verifyCode(phone, purpose, code);
+    if (!r.ok) {
+      const map:any = {
+        NO_ACTIVE_CODE: { s:400, c:"NO_ACTIVE_CODE", m:"No valid code. Request again." },
+        EXPIRED:       { s:400, c:"OTP_EXPIRED",   m:"Code expired." },
+        MISMATCH:      { s:401, c:"INVALID_CODE",  m:"Invalid code." },
+        LOCKED:        { s:429, c:"OTP_LOCKED",    m:"Too many attempts. Try later." },
+      };
+      const m = map[(r as any).reason] ?? { s:400, c:"INVALID", m:"Invalid request." };
+      return NextResponse.json({ success:false, code:m.c, message:m.m, data:null, requestId }, { status:m.s });
     }
+
+    // 성공 → JWT 발급 + 세션 쿠키 세팅
+    const userId = "u_" + Buffer.from(String(phone)).toString("base64url");
+    const accessToken = signJwt({ sub: userId });
+    const res = NextResponse.json({ success:true, code:"OK", message:"Verified", data:{ accessToken, userId }, requestId });
+    setSessionCookie(res, accessToken);
+    return res;
+  } catch (e:any) {
+    return NextResponse.json({ success:false, code:"INTERNAL_ERROR", message:e?.message ?? "Unexpected error", data:null, requestId }, { status:500 });
   }
-  
+}
