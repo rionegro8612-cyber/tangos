@@ -1,0 +1,82 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import Image from 'next/image';
+
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error("Supabase 환경변수가 설정되지 않았습니다.");
+}
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+export default function ProfilePage() {
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 사용자 인증 및 프로필 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('프로필 불러오기 실패:', error.message);
+      } else {
+        setProfile(data);
+      }
+      setLoading(false);
+    };
+
+    fetchProfile();
+
+    // 세션 만료 처리
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        window.location.href = '/login';
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (loading) {
+    return <main className="mx-auto max-w-[430px] p-6">⏳ 프로필 불러오는 중...</main>;
+  }
+
+  if (!profile) {
+    return <main className="mx-auto max-w-[430px] p-6">❌ 프로필 정보를 찾을 수 없습니다.</main>;
+  }
+
+  return (
+    <main className="mx-auto max-w-[430px] p-6">
+      <h1 className="text-xl font-semibold">내 프로필</h1>
+      <p>닉네임: {profile.nickname ?? '없음'}</p>
+      <p>지역 코드: {profile.region_code ?? '없음'}</p>
+      <div className="mt-4">
+        <Image
+          src={profile.avatar_url ?? '/default-avatar.png'}
+          alt="아바타"
+          width={80}
+          height={80}
+          className="rounded-full"
+        />
+      </div>
+    </main>
+  );
+}
+

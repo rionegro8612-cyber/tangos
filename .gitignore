@@ -24,3 +24,8 @@ coverage/
 *.zip
 *.tar
 *.tar.gz
+# env files
+apps/server/.env
+apps/server/.env.local
+apps/server/.env.prod
+tango-web/.env*
