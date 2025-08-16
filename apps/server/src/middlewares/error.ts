@@ -1,11 +1,12 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
-export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  console.error(`[${req.requestId}] Error:`, err);
-  
-  res.status(500).json({
-    error: 'Internal Server Error',
-    requestId: req.requestId,
-    timestamp: new Date().toISOString()
+export default function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
+  const code = err?.status || 500;
+  const requestId = (req as any).requestId || null;
+  res.status(code).json({
+    success: false,
+    code,
+    message: err?.message || 'Internal Server Error',
+    requestId,
   });
 }

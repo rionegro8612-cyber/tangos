@@ -1,0 +1,324 @@
+﻿import { Router } from "express";
+import type { Request, Response, NextFunction } from "express";
+import { issueCode, verifyCode } from "../auth/sms/otpRepo";
+import {
+  findOrCreateUserByPhoneE164,
+  getUserProfile,
+  touchLastLogin,
+} from "../repos/userRepo";
+import { signAccess, signRefresh, verifyToken } from "../lib/jwt";
+import {
+  storeRefresh,
+  isRefreshValid,
+  revokeRefresh,
+  replaceRefresh,
+} from "../auth/refreshRepo";
+
+export const authRouter = Router();
+
+/** Authorization: Bearer 또는 httpOnly cookie에서 access 토큰 추출 */
+function getTokenFromReq(req: Request) {
+  const hdr = req.headers.authorization || "";
+  const m = hdr.match(/^Bearer\s+(.+)$/i);
+  return m?.[1] || (req.cookies?.access_token as string | undefined);
+}
+
+/** 쿠키 세팅: .env로 옵션 제어 */
+function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+  const prod = process.env.NODE_ENV === "production";
+  const secure =
+    String(process.env.COOKIE_SECURE || "").trim().toLowerCase() === "true" || prod;
+  const domain = process.env.COOKIE_DOMAIN || undefined;
+  const sameSite: "lax" | "strict" = prod ? "strict" : "lax";
+
+  res.cookie("access_token", accessToken, {
+    httpOnly: true,
+    sameSite,
+    secure,
+    domain,
+    maxAge: Number(process.env.JWT_ACCESS_EXPIRES_MIN ?? 15) * 60 * 1000,
+    path: "/",
+  });
+  res.cookie("refresh_token", refreshToken, {
+    httpOnly: true,
+    sameSite,
+    secure,
+    domain,
+    maxAge: Number(process.env.JWT_REFRESH_EXPIRES_DAYS ?? 14) * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+/** POST /api/v1/auth/send-sms */
+authRouter.post(
+  "/send-sms",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { phone } = req.body as { phone?: string };
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          code: "BAD_REQUEST",
+          message: "phone required",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const forceDev = String(req.query.dev ?? "").trim() === "1";
+      const r = await issueCode(phone, { forceDev }); // otpRepo가 해당 옵션 지원
+
+      if (!r.ok) {
+        return res.status(429).json({
+          success: false,
+          code: r.code,
+          message: r.message,
+          data: { retryAfterSec: (r as any).retryAfterSec ?? 60 },
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      // devCode 노출 판단
+      const providerIsMock =
+        String(process.env.SMS_PROVIDER || "").trim().toLowerCase() === "mock";
+      const debugOtpOn = ["1", "true", "yes", "on"].includes(
+        String(process.env.DEBUG_OTP ?? "").trim().toLowerCase()
+      );
+      const includeDev = forceDev || providerIsMock || debugOtpOn;
+
+      const data: any = { phoneE164: r.phoneE164, expiresInSec: r.expiresInSec };
+      if (includeDev && (r as any)._codeForDev) {
+        data.devCode = (r as any)._codeForDev;
+        // eslint-disable-next-line no-console
+        console.log(`[DEV][OTP] ${r.phoneE164} -> ${(r as any)._codeForDev}`);
+      }
+
+      return res.ok(data, "OTP_SENT");
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/** POST /api/v1/auth/verify-code */
+authRouter.post(
+  "/verify-code",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { phone, code } = req.body as { phone?: string; code?: string };
+      if (!phone || !code) {
+        return res.status(400).json({
+          success: false,
+          code: "BAD_REQUEST",
+          message: "phone & code required",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const r = await verifyCode(phone, code);
+      if (!r.ok) {
+        return res.status(400).json({
+          success: false,
+          code: r.code,
+          message: r.message,
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const userId = await findOrCreateUserByPhoneE164(r.phoneE164!);
+      await touchLastLogin(userId);
+
+      const accessToken = signAccess({ uid: userId });
+      const refreshToken = signRefresh({ uid: userId });
+
+      // refresh 만료 계산 후 DB 저장(해시 기준)
+      const decoded: any = verifyToken(refreshToken);
+      const expMs =
+        decoded?.exp
+          ? decoded.exp * 1000
+          : Date.now() +
+            Number(process.env.JWT_REFRESH_EXPIRES_DAYS ?? 14) * 864e5;
+
+      await storeRefresh(
+        userId,
+        refreshToken,
+        new Date(expMs).toISOString(),
+        (req.headers["user-agent"] as string) || "",
+        (req.ip || req.socket?.remoteAddress || null) as any
+      );
+
+      if (process.env.AUTH_COOKIE === "1") {
+        setAuthCookies(res, accessToken, refreshToken);
+        return res.ok({ userId }, "LOGIN_OK");
+      }
+      return res.ok({ accessToken, refreshToken, userId }, "LOGIN_OK");
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/** POST /api/v1/auth/refresh  — 리프레시 토큰 로테이션 적용 */
+authRouter.post(
+  "/refresh",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const oldToken =
+        (req.cookies?.refresh_token as string) ||
+        (req.body?.refreshToken as string);
+
+      if (!oldToken) {
+        return res.status(401).json({
+          success: false,
+          code: "UNAUTHORIZED",
+          message: "missing refresh token",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const decoded: any = verifyToken(oldToken);
+      const userId = Number(decoded?.uid);
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          code: "UNAUTHORIZED",
+          message: "invalid token",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const valid = await isRefreshValid(userId, oldToken);
+      if (!valid) {
+        return res.status(401).json({
+          success: false,
+          code: "UNAUTHORIZED",
+          message: "refresh invalid",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      // 새 토큰 발급
+      const newAccess = signAccess({ uid: userId });
+      const newRefresh = signRefresh({ uid: userId });
+
+      // 새 refresh 만료 계산
+      const dNew: any = verifyToken(newRefresh);
+      const expMs =
+        dNew?.exp
+          ? dNew.exp * 1000
+          : Date.now() +
+            Number(process.env.JWT_REFRESH_EXPIRES_DAYS ?? 14) * 864e5;
+
+      // DB 반영: 이전 revoke + 새 insert (해시 기준)
+      await replaceRefresh(
+        userId,
+        oldToken,
+        newRefresh,
+        new Date(expMs).toISOString(),
+        (req.headers["user-agent"] as string) || null,
+        (req.ip || req.socket?.remoteAddress || null) as any
+      );
+
+      if (process.env.AUTH_COOKIE === "1") {
+        const prod = process.env.NODE_ENV === "production";
+        const secure =
+          prod ||
+          String(process.env.COOKIE_SECURE || "").trim().toLowerCase() ===
+            "true";
+        const sameSite: "lax" | "strict" = prod ? "strict" : "lax";
+        const domain = process.env.COOKIE_DOMAIN || undefined;
+
+        res.cookie("access_token", newAccess, {
+          httpOnly: true,
+          sameSite,
+          secure,
+          domain,
+          maxAge: Number(process.env.JWT_ACCESS_EXPIRES_MIN ?? 15) * 60 * 1000,
+          path: "/",
+        });
+        res.cookie("refresh_token", newRefresh, {
+          httpOnly: true,
+          sameSite,
+          secure,
+          domain,
+          maxAge:
+            Number(process.env.JWT_REFRESH_EXPIRES_DAYS ?? 14) *
+            24 *
+            60 *
+            60 *
+            1000,
+          path: "/",
+        });
+
+        return res.ok({ userId }, "REFRESH_OK");
+      }
+
+      return res.ok(
+        { accessToken: newAccess, refreshToken: newRefresh, userId },
+        "REFRESH_OK"
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/** POST /api/v1/auth/logout */
+authRouter.post(
+  "/logout",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const token =
+        (req.cookies?.refresh_token as string) ||
+        (req.body?.refreshToken as string);
+      if (token) await revokeRefresh(token);
+      res.clearCookie("access_token");
+      res.clearCookie("refresh_token");
+      return res.ok({}, "LOGOUT_OK");
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/** GET /api/v1/auth/me */
+authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = getTokenFromReq(req);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "missing token",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    const decoded: any = verifyToken(token);
+    const userId = Number(decoded?.uid);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "invalid token",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    const user = await getUserProfile(userId);
+    return res.ok({ user }, "ME_OK");
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 호환성 위해 default export도 제공
+export default authRouter;
+

@@ -1,15 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import type { Request, Response, NextFunction } from 'express';
+import { v4 as uuid } from 'uuid';
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestId: string;
-    }
-  }
-}
-
-export function requestId(req: Request, res: Response, next: NextFunction) {
-  req.requestId = uuidv4();
+export default function requestId(req: Request, _res: Response, next: NextFunction) {
+  (req as any).requestId = req.headers['x-request-id'] || uuid();
   next();
 }

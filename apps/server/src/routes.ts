@@ -1,18 +1,11 @@
-import { Router } from 'express';
-import { authRouter } from './routes/auth.js';
+import { Router } from "express";
+import authRouter from "./routes/auth.mvp";
+import userRouter from "./routes/user";      // ← 추가
 
-const router = Router();
+export const router = Router();
 
-// 인증 라우트
-router.use('/auth', authRouter);
+router.use("/auth", authRouter);
+router.use("/user", userRouter);             // ← 추가
 
-// 헬스체크
-router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    requestId: req.requestId 
-  });
-});
+export default router;
 
-export { router };
