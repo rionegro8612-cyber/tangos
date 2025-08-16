@@ -21,3 +21,10 @@ export async function getUserProfile(userId: number) {
 export async function touchLastLogin(userId: number) {
   await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [userId]);
 }
+export async function updateUserNickname(userId: number, nickname: string | null) {
+  const rows = await query<{ id: number }>(
+    `UPDATE users SET nickname = $2, updated_at = NOW() WHERE id = $1 RETURNING id`,
+    [userId, nickname]
+  );
+  return rows.length > 0;
+}
