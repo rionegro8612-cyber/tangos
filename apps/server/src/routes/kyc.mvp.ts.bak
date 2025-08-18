@@ -1,0 +1,49 @@
+﻿import { Router } from 'express';
+import { pool } from '../lib/db';
+import { verifyPASS } from '../lib/vendors/passClient';
+import { verifyNICE } from '../lib/vendors/niceClient';
+
+const router = Router();
+
+router.post('/kyc/pass', async (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || '');
+  const birth = String(body.birth || '');
+  const phone = String(body.phone || '');
+  const carrier = String(body.carrier || '');
+
+  if (!name || !birth || !phone || !carrier) {
+    return res.status(400).json({ success: false, code: 'INVALID_ARG', message: 'name, birth, phone, carrier required' });
+  }
+
+  try {
+    let verified = false;
+    let providerTraceId = '';
+
+    // 1차 PASS, 실패 시 NICE 폴백
+    try {
+      const r1: any = await verifyPASS({ name, birth, phone, carrier });
+      verified = !!(r1 && r1.verified);
+      providerTraceId = String((r1 && r1.providerTraceId) ? r1.providerTraceId : '');
+    } catch (e) {
+      const r2: any = await verifyNICE({ name, birth, phone, carrier });
+      verified = !!(r2 && r2.verified);
+      providerTraceId = String((r2 && r2.providerTraceId) ? r2.providerTraceId : '');
+    }
+
+    if (!verified) {
+      return res.status(403).json({ success: false, code: 'KYC_FAILED', message: 'kyc failed' });
+    }
+
+    await pool.query(
+      'UPDATE users SET is_kyc_verified=TRUE, kyc_verified_at=NOW() WHERE phone_e164_norm=$1',
+      [phone]
+    );
+
+    return res.status(200).json({ success: true, code: 'OK', message: 'kyc verified', data: { providerTraceId } });
+  } catch (err: any) {
+    return res.status(502).json({ success: false, code: 'KYC_PROVIDER_ERROR', message: String(err && err.message || 'KYC error') });
+  }
+});
+
+export default router;

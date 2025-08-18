@@ -1,47 +1,46 @@
-﻿// src/lib/db.ts
-import path from 'path';
-import fs from 'fs';
-import dotenv from 'dotenv';
-import { Pool } from 'pg';
+﻿// apps/server/src/lib/db.ts
+import { Pool } from "pg";
 
-// 여러 위치 후보에서 .env 탐색 (ts-node/dev & dist 모두 대응)
-const candidates = [
-  path.resolve(process.cwd(), '.env'),         // 현재 작업 디렉토리
-  path.resolve(__dirname, '../../.env'),       // dist/lib -> ../../.env or src/lib -> ../../.env
-  path.resolve(__dirname, '../.env'),          // 혹시 src 바로 아래에 있는 경우
-];
+// NOTE:
+// - dotenv 로드는 src/index.ts에서 `import "./env"`로 이미 끝났다고 가정합니다.
+// - 여기서는 __dirname, import.meta.url 같은 경로 계산을 전혀 사용하지 않습니다.
 
-let loadedFrom = '';
-for (const p of candidates) {
-  if (fs.existsSync(p)) {
-    dotenv.config({ path: p });
-    loadedFrom = p;
-    break;
-  }
-}
-if (!loadedFrom) {
-  // 마지막 시도: 기본(.env) 로드
-  dotenv.config();
-}
-
-// 필수 env 검사
 function required(name: string) {
   const v = process.env[name];
   if (!v) throw new Error(`[DB] Missing required env: ${name}`);
   return v;
 }
 
-const host = required('DB_HOST');
-const port = Number(required('DB_PORT'));
-const user = required('DB_USER');
-const password = String(required('DB_PASSWORD'));
-const database = required('DB_NAME');
+const sslRequired =
+  (process.env.PGSSLMODE || process.env.DB_SSLMODE) === "require"
+    ? { rejectUnauthorized: false }
+    : undefined;
 
-export const pool = new Pool({
-  host,
-  port,
-  user,
-  password,
-  database,
-  ssl: process.env.DB_SSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
-});
+let pool: Pool;
+
+if (process.env.DATABASE_URL) {
+  // 우선순위 1: DATABASE_URL
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: sslRequired,
+  });
+} else {
+  // 우선순위 2: 개별 변수(DB_*)
+  const host = required("DB_HOST");
+  const port = Number(required("DB_PORT"));
+  const user = required("DB_USER");
+  const password = String(required("DB_PASSWORD"));
+  const database = required("DB_NAME");
+
+  pool = new Pool({
+    host,
+    port,
+    user,
+    password,
+    database,
+    ssl: sslRequired,
+  });
+}
+
+export { pool };
+

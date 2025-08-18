@@ -12,7 +12,7 @@ export type User = {
   // phone?: string | null;
 };
 
-type AuthState = {
+export type AuthState = {
   ready: boolean;
   user: User | null;
   setReady: (v: boolean) => void;
@@ -36,12 +36,12 @@ const safeJson = async (res: Response) => {
 const extractUser = (j: any): User | null =>
   j?.data?.user ?? j?.user ?? (typeof j?.data === 'object' ? j.data : null) ?? null;
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set: (state: Partial<AuthState>) => void) => ({
   ready: false,
   user: null,
 
-  setReady: (v) => set({ ready: v }),
-  setUser: (u) => set({ user: u }),
+  setReady: (v: boolean) => set({ ready: v }),
+  setUser: (u: User | null) => set({ user: u }),
 
   // 앱 시작 시 1회 실행: me → (401) refresh → me 재시도
   bootstrap: async () => {

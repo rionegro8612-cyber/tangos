@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/src/store/auth';
+import type { AuthState } from '../store/auth';
 
 type AnyJson = Record<string, any> | null;
 
@@ -19,8 +20,8 @@ function pickUser(json: AnyJson) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const setUser = useAuthStore((s) => s.setUser);
+  const user = useAuthStore((s: AuthState) => s.user);
+  const setUser = useAuthStore((s: AuthState) => s.setUser);
   const [meLoading, setMeLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
