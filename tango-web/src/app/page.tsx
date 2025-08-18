@@ -5,6 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/src/store/auth';
 
+type AnyJson = Record<string, any> | null;
+
+function pickUser(json: AnyJson) {
+  // 서버 응답 형태가 {data:{user}}, {user}, {data} 등 다양해도 안전하게 파싱
+  return (
+    json?.data?.user ??
+    json?.user ??
+    (json?.data && typeof json.data === 'object' && 'id' in json.data ? json.data : null) ??
+    null
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -12,36 +24,50 @@ export default function ProfilePage() {
   const [meLoading, setMeLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const apiBase =
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') || '';
+  const apiBase = (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    'http://localhost:4100'
+  ).replace(/\/+$/, '');
 
   // 프로필 진입 시 유저가 없으면 /auth/me로 한번 보강
   useEffect(() => {
     let alive = true;
+    const ctl = new AbortController();
+
     (async () => {
       if (user) return;
       setMeLoading(true);
       try {
         const res = await fetch(`${apiBase}/api/v1/auth/me`, {
           credentials: 'include',
+          signal: ctl.signal,
         });
-        const json = await res.json();
+
         if (!alive) return;
 
-        if (res.ok && json?.success && json?.data?.user) {
-          setUser(json.data.user);
-        } else {
-          // 토큰 없거나 만료 → 로그인으로
+        if (!res.ok) {
           router.replace('/login');
+          return;
         }
+
+        // JSON 파싱 실패 케이스 방지
+        const text = await res.text();
+        const json: AnyJson = text ? JSON.parse(text) : null;
+
+        const u = pickUser(json);
+        if (u) setUser(u);
+        else router.replace('/login');
       } catch {
         if (alive) router.replace('/login');
       } finally {
         if (alive) setMeLoading(false);
       }
     })();
+
     return () => {
       alive = false;
+      ctl.abort();
     };
   }, [apiBase, router, setUser, user]);
 
@@ -53,13 +79,12 @@ export default function ProfilePage() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
-      setUser(null);
-      router.replace('/login');
-    } catch (e) {
-      console.error('[logout] failed', e);
-      alert('로그아웃 중 문제가 발생했습니다.');
+    } catch {
+      // 무시: 어차피 세션 정리/리디렉트
     } finally {
       setLogoutLoading(false);
+      setUser(null);
+      router.replace('/login');
     }
   }
 
@@ -90,7 +115,7 @@ export default function ProfilePage() {
           </div>
           <div>
             <span className="text-gray-500">전화번호</span> :{' '}
-            <b>{user.phone_e164_norm}</b>
+            <b>{user.phone_e164_norm ?? (user as any).phone ?? '-'}</b>
           </div>
           <div>
             <span className="text-gray-500">닉네임</span> :{' '}
@@ -98,11 +123,11 @@ export default function ProfilePage() {
           </div>
           <div>
             <span className="text-gray-500">마지막 로그인</span> :{' '}
-            <b>{user.last_login_at}</b>
+            <b>{user.last_login_at ?? '-'}</b>
           </div>
           <div>
             <span className="text-gray-500">가입일</span> :{' '}
-            <b>{user.created_at}</b>
+            <b>{user.created_at ?? '-'}</b>
           </div>
         </div>
       ) : (

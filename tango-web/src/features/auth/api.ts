@@ -11,7 +11,7 @@ export async function sendSms(dto: SendSmsDto) {
 }
 
 export async function verifyCode(dto: VerifyCodeDto) {
-  return apiFetch<{ accessToken: string; refreshToken?: string; userId: string }>(
+  return apiFetch<{ success: boolean; message?: string }>(
     "/api/v1/auth/verify-code",
     { method: "POST", body: JSON.stringify(dto) }
   );
