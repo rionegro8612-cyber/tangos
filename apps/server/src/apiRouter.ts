@@ -1,13 +1,26 @@
 import { Router } from "express";
+
+// 기존 라우터
 import { loginRouter } from "./routes/auth.login";
 import { refreshRouter } from "./routes/auth.refresh";
 import { logoutRouter } from "./routes/auth.logout";
 import { kycRouter } from "./routes/kyc";
 
+// 새로 추가한 라우터
+import { registerRouter } from "./routes/auth.register";
+import { profileRouter } from "./routes/profile";
+
 export const router = Router();
 
-router.use("/auth", loginRouter);   // /auth/verify-code (로그인용)
-router.use("/auth", refreshRouter); // /auth/refresh
-router.use("/auth", logoutRouter);  // /auth/logout
-router.use("/auth", kycRouter);     // /auth/kyc/*
+// 기존
+router.use("/auth", loginRouter);    // /api/v1/auth/verify-code (로그인용)
+router.use("/auth", refreshRouter);  // /api/v1/auth/refresh
+router.use("/auth", logoutRouter);   // /api/v1/auth/logout
+router.use("/auth", kycRouter);      // /api/v1/auth/kyc/*
 
+// ★ 신규 회원가입/프로필 라우터 장착
+router.use("/auth", registerRouter); // /api/v1/auth/register/*
+router.use("/", profileRouter);      // /api/v1/profile/*
+router.get("/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
+
+console.log("[apiRouter] 라우터 등록 완료", router.stack.length, router.stack.map(l => l.route?.path || l.name));

@@ -69,5 +69,22 @@ type OtpRecord = {
     return { TTL_SEC, RESEND_COOLDOWN_SEC, MAX_ATTEMPTS, LOCK_MIN };
   }
 
+export function generateCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+export function verifyCode(phone: string, code: string): boolean {
+  const rec = store.get(phone);
+  if (!rec) return false;
+  if (rec.lockedUntil && Date.now() < rec.lockedUntil) return false;
+  if (Date.now() > rec.expiresAt) return false;
+  if (rec.code !== code) {
+    incAttempt(phone);
+    return false;
+  }
+  clear(phone);
+  return true;
+}
+
 
 

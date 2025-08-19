@@ -10,17 +10,20 @@ import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
 
 const app = express();
-
 app.disable("x-powered-by");
 
+// ▼ 필수 파서 (JSON/FORM/쿠키)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// ▼ 보안/로그/CORS
 const TRUST_PROXY = process.env.TRUST_PROXY ?? "1";
-app.set("trust proxy", /^\d+$/.test(TRUST_PROXY) ? Number(TRUST_PROXY) : TRUST_PROXY);
+app.set("trust proxy", TRUST_PROXY === "1" ? 1 : TRUST_PROXY);
 
-// ✅ 건강 체크(미들웨어 영향 X)
-app.get("/health", (_req, res) => res.status(200).type("text/plain").send("OK"));
-app.get("/api/v1/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(morgan("dev"));
 
-// ✅ CORS
 const envAllow = (process.env.FRONT_ORIGINS || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 const defaultDevAllows = ["http://localhost:3000", "http://127.0.0.1:3000"];
@@ -32,35 +35,27 @@ const corsDelegate: CorsOptionsDelegate = (req, cb) => {
   cb(null, {
     origin: ok,
     credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
+    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-    allowedHeaders: ["Content-Type","Authorization","X-Requested-With","Accept"],
-    exposedHeaders: ["Set-Cookie"],
-    maxAge: 600,
   });
 };
 app.use(cors(corsDelegate));
 
-// 보안/파서/쿠키/로그
-app.use(helmet());
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: false, limit: "1mb" }));
-app.use(cookieParser());
-app.use(morgan("dev", { skip: (req) => req.path === "/health" || req.path === "/favicon.ico" }));
-
-// 공통 미들웨어
+// ▼ 공통 미들웨어(요청ID, 표준 응답 래퍼)
 app.use(requestId);
 app.use(responseMiddleware);
 
-// ✅ API 엔트리 (apiRouter 쪽에서 /auth 에 kycRouter 부착)
-const API_BASE = "/api/v1";
+// ▼ 헬스체크 (항상 라우터 마운트보다 위에!)
+app.get("/health", (_req, res) => res.status(200).type("text/plain").send("OK"));
+app.get("/api/v1/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
+// ▼ API 라우터 마운트 (가장 중요!)
+const API_BASE = process.env.API_BASE || "/api/v1";
 app.use(API_BASE, router);
 
-// 표준 에러 핸들러
+// ▼ 에러 핸들러
 app.use(standardErrorHandler);
 
-// 개발: 라우트 테이블 로깅
+// ▼ 개발 시 등록된 라우트 로그
 if (process.env.NODE_ENV !== "production") {
   const logRoutes = () => {
     type Row = { method: string; path: string };
@@ -75,26 +70,25 @@ if (process.env.NODE_ENV !== "production") {
       return src;
     };
     const walk = (stack: any[], prefix = "") => {
-      stack.forEach((layer: any) => {
-        if (layer.route?.path) {
-          const methods = Object.keys(layer.route.methods).map((v) => v.toUpperCase());
-          const p = prefix + (layer.route.path === "/" ? "" : layer.route.path);
-          methods.forEach((m) => rows.push({ method: m, path: p || "/" }));
-        } else if (layer.name === "router" && layer.handle?.stack) {
-          const mount = regexpToPath(layer.regexp);
-          walk(layer.handle.stack, prefix + mount);
+      stack.forEach((layer) => {
+        if (layer?.route) {
+          const p = prefix + layer.route.path;
+          rows.push({ method: Object.keys(layer.route.methods)[0]?.toUpperCase(), path: p });
+        } else if (layer?.name === "router" && layer?.handle?.stack) {
+          const pfx = prefix + regexpToPath(layer.regexp);
+          walk(layer.handle.stack, pfx);
         }
       });
     };
-    const rootStack: any[] = (app as any)?._router?.stack || [];
-    walk(rootStack, "");
+    // @ts-ignore
+    walk(app._router?.stack || []);
     const filtered = rows
       .filter((r) => r.path.startsWith(API_BASE))
       .sort((a, b) => (a.path === b.path ? a.method.localeCompare(b.method) : a.path.localeCompare(b.path)));
     console.log("\n[dev] Registered routes:");
     console.table(filtered);
   };
-  setTimeout(logRoutes, 120);
+  setTimeout(logRoutes, 200);
 }
 
 const port = Number(process.env.PORT) || 4100;

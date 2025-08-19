@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { SMSService } from '../auth/sms/service.js';
+import { SMSService } from '../auth/sms/service';
 
 const router = Router();
 const smsService = new SMSService();

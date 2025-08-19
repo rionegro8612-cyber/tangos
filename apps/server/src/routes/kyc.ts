@@ -23,7 +23,7 @@ router.post("/api/v1/auth/kyc/pass", authRequired, async (req: Request, res: Res
     if (!result.ok) {
       const code = result.reason === "TEMPORARY_FAILURE" ? 502 : 401;
       return res.fail(code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH",
-        result.reason === "TEMPORARY_FAILURE" ? "외부 연동 장애/타임아웃" : "본인정보가 일치하지 않습니다.");
+        result.reason === "TEMPORARY_FAILURE" ? "외부 연동 장애" : "본인정보 불일치");
     }
 
     const userId = (req as any).user?.uid;

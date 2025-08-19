@@ -1,0 +1,4 @@
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS region_code VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS region_label TEXT;
