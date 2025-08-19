@@ -1,6 +1,6 @@
 // apps/server/src/middlewares/requireAuth.ts
-import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../lib/jwt";
+import type { Request, Response, NextFunction } from "express";
+import { verifyAccessToken } from "../lib/jwt";
 import { COOKIE_NAME } from "../lib/cookies";
 
 export default function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -13,7 +13,7 @@ export default function requireAuth(req: Request, res: Response, next: NextFunct
     if (!token) {
       return res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "no token", data: null, requestId: (req as any).id });
     }
-    const decoded = verifyToken(token);
+    const decoded = verifyAccessToken(token);
     (req as any).user = decoded;
     next();
   } catch (e: any) {

@@ -1,13 +1,13 @@
 import { Router } from "express";
+import { loginRouter } from "./routes/auth.login";
+import { refreshRouter } from "./routes/auth.refresh";
+import { logoutRouter } from "./routes/auth.logout";
 import { kycRouter } from "./routes/kyc";
-// import ... (auth, user 등 다른 라우터)
 
 export const router = Router();
 
-// 기존 라우터들...
-// router.use("/auth", authRouter);
-// router.use("/users", userRouter);
-
-// ✅ KYC 라우터를 /api/v1/auth/* 하위로 마운트
-router.use("/auth", kycRouter);
+router.use("/auth", loginRouter);   // /auth/verify-code (로그인용)
+router.use("/auth", refreshRouter); // /auth/refresh
+router.use("/auth", logoutRouter);  // /auth/logout
+router.use("/auth", kycRouter);     // /auth/kyc/*
 

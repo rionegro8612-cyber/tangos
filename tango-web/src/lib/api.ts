@@ -100,3 +100,27 @@ export async function updateProfile(nickname: string | null) {
     { method: "POST", body: JSON.stringify({ nickname }) },
   );
 }
+
+export async function api(path: string, init?: RequestInit) {
+  const res = await fetch(`/api${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    ...init,
+  });
+  if (res.status === 401) {
+    const r = await fetch(`/api/v1/auth/refresh`, { method: "POST", credentials: "include" });
+    if (r.ok) {
+      const retry = await fetch(`/api${path}`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+        ...init,
+      });
+      const j2 = await retry.json().catch(() => ({}));
+      if (retry.ok) return j2;
+      throw j2;
+    }
+  }
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw j;
+  return j;
+}

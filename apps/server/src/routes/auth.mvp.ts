@@ -7,7 +7,7 @@ import {
   getUserProfile,
   touchLastLogin,
 } from "../repos/userRepo";
-import { signAccess, verifyToken } from "../lib/jwt";
+import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
 
 export const authRouter = Router();
 
@@ -112,7 +112,8 @@ authRouter.post(
       await touchLastLogin(userId);
 
       // Access 토큰 발급
-      const accessToken = signAccess({ uid: userId });
+      const jti = newJti();
+      const accessToken = signAccessToken(userId, jti);
 
       // 쿠키 사용 여부(AUTH_COOKIE=1) — 기본은 켜져있다고 가정
       if (String(process.env.AUTH_COOKIE || "1") === "1") {
@@ -158,7 +159,7 @@ authRouter.get(
         });
       }
 
-      const decoded: any = verifyToken(token);
+      const decoded: any = verifyAccessToken(token);
       const userId = Number(decoded?.uid);
       if (!userId) {
         return res.status(401).json({

@@ -77,3 +77,11 @@ export async function updateKycStatus(userId: number, provider: string) {
     [provider, userId]
   );
 }
+
+export async function findByPhone(phone: string) {
+  const rows = await query<{ id: number }>(
+    `SELECT id FROM users WHERE phone_e164_norm = $1`,
+    [phone]
+  );
+  return rows[0] ?? null;
+}
