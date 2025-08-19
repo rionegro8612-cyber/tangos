@@ -1,24 +1,22 @@
-import type { Request, Response, NextFunction } from "express";
+// apps/server/src/middlewares/requireAuth.ts
+import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../lib/jwt";
+import { COOKIE_NAME } from "../lib/cookies";
 
-export interface AuthedRequest extends Request {
-  userId?: number;
-}
-
-export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
+export default function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const hdr = req.headers.authorization ?? "";
-    const m = hdr.match(/^Bearer\s+(.+)$/i);
-    const token = m?.[1] || (req.cookies?.access_token as string | undefined);
-    if (!token) return res.fail("UNAUTHORIZED", "missing token", 401);
-
-    const decoded: any = verifyToken(token);
-    const uid = Number(decoded?.uid);
-    if (!uid) return res.fail("UNAUTHORIZED", "invalid token", 401);
-
-    req.userId = uid;
+    let token = req.cookies?.[COOKIE_NAME];
+    if (!token) {
+      const h = req.headers.authorization || "";
+      if (h.startsWith("Bearer ")) token = h.slice(7);
+    }
+    if (!token) {
+      return res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "no token", data: null, requestId: (req as any).id });
+    }
+    const decoded = verifyToken(token);
+    (req as any).user = decoded;
     next();
   } catch (e: any) {
-    return res.fail("UNAUTHORIZED", e?.message || "unauthorized", 401);
+    return res.status(401).json({ success: false, code: "UNAUTHORIZED", message: e?.message || "invalid token", data: null, requestId: (req as any).id });
   }
 }

@@ -1,14 +1,19 @@
 // apps/server/src/routes/index.ts
 import { Router } from "express";
-import kycRouter from "./kyc.mvp";   // ⬅️ default export이므로 이렇게 import
+import authRouter from "./auth.mvp";
+import kycRouter from "./kyc.mvp";
+import userRouter from "./user";
 
 export const router = Router();
 
 // 헬스체크
-router.get("/_ping", (_req, res) => {
-  res.json({ ok: true });
-});
+router.get("/_ping", (_req, res) => res.json({ ok: true }));
 
-// /api/v1/auth/kyc/pass 경로 활성화
+// Auth (로그인/SMS/리프레시/로그아웃/ME 등)
+router.use("/auth", authRouter);
+// KYC (PASS/NICE 등)
 router.use("/auth", kycRouter);
+// User (프로필 등)
+router.use("/user", userRouter);
 
+export default router;

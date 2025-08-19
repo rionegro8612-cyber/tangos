@@ -1,24 +1,19 @@
-import { Response } from 'express';
+// apps/server/src/lib/cookies.ts
+import type { CookieOptions } from "express";
 
-const domain = process.env.COOKIE_DOMAIN || 'localhost';
-const secure = String(process.env.COOKIE_SECURE || 'false') === 'true';
+const cookieName = "tango_at"; // Access Token 쿠키 이름
+export const COOKIE_NAME = cookieName;
 
-const base = {
-  httpOnly: true as const,
-  secure,                 // 프로덕션에선 true (HTTPS 필요)
-  sameSite: 'lax' as const,
-  domain,
-  path: '/',
-};
-
-export function setAuthCookies(res: Response, at: string, rt?: string) {
-  // Access: 30분
-  res.cookie('at', at, { ...base, maxAge: 30 * 60 * 1000 });
-  // Refresh: 30일
-  if (rt) res.cookie('rt', rt, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
-}
-
-export function clearAuthCookies(res: Response) {
-  res.clearCookie('at', { ...base });
-  res.clearCookie('rt', { ...base });
+export function accessCookieOptions(): CookieOptions {
+  const secure = String(process.env.COOKIE_SECURE || "false") === "true";
+  const domain = process.env.COOKIE_DOMAIN || undefined;
+  const maxAgeMin = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30);
+  return {
+    httpOnly: true,
+    secure,                          // 로컬 HTTP면 false, 배포면 true
+    sameSite: secure ? "none" : "lax",
+    domain,                          // 필요 없으면 undefined 유지
+    path: "/",
+    maxAge: maxAgeMin * 60 * 1000,
+  };
 }
