@@ -1,19 +1,16 @@
-// apps/server/src/lib/cookies.ts
 import type { CookieOptions } from "express";
 
-const cookieName = "tango_at"; // Access Token 쿠키 이름
-export const COOKIE_NAME = cookieName;
+export const COOKIE_NAME = "tango_at";
 
 export function accessCookieOptions(): CookieOptions {
-  const secure = String(process.env.COOKIE_SECURE || "false") === "true";
-  const domain = process.env.COOKIE_DOMAIN || undefined;
-  const maxAgeMin = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30);
+  const isProd = process.env.NODE_ENV === "production";
+  const secure = isProd ? true : false; // dev는 false
+  const sameSite = isProd ? "none" : "lax";
   return {
     httpOnly: true,
-    secure,                          // 로컬 HTTP면 false, 배포면 true
-    sameSite: secure ? "none" : "lax",
-    domain,                          // 필요 없으면 undefined 유지
+    secure,
+    sameSite: sameSite as any,
     path: "/",
-    maxAge: maxAgeMin * 60 * 1000,
+    maxAge: 60 * 60 * 24 * 7 * 1000, // 7d
   };
 }

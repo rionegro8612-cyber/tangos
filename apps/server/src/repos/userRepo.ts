@@ -66,3 +66,14 @@ export async function updateUserNickname(userId: number, nickname: string | null
   );
   return rows.length > 0;
 }
+
+export async function updateKycStatus(userId: number, provider: string) {
+  await query(
+    `UPDATE users
+       SET kyc_verified = TRUE,
+           kyc_provider = $1,
+           kyc_checked_at = NOW()
+     WHERE id = $2`,
+    [provider, userId]
+  );
+}

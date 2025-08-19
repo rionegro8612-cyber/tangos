@@ -1,30 +1,42 @@
 import { Router } from "express";
-import { verifyPASS } from "../lib/vendors/passClient";
-import { verifyNICE } from "../lib/vendors/niceClient";
+import type { Request, Response, NextFunction } from "express";
+import { authRequired } from "../middlewares/auth";
+import { calcAgeFromBirthYYYYMMDD } from "../lib/age";
+import { verifyKyc } from "../external/kyc";
+import { updateKycStatus } from "../repos/userRepo";
 
 const router = Router();
 
-// POST /api/v1/auth/kyc/pass
-router.post("/kyc/pass", async (req, res) => {
-  const { name, birth, phone, carrier } = req.body || {};
-  if (!name || !birth || !phone || !carrier) {
-    return res.fail("INVALID_ARG", "name, birth, phone, carrier required", 400);
-  }
+/** POST /api/v1/auth/kyc/pass */
+router.post("/api/v1/auth/kyc/pass", authRequired, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    let verified = false, providerTraceId = "";
-    try {
-      const r1 = await verifyPASS({ name, birth, phone, carrier });
-      verified = r1.verified; providerTraceId = (r1 as any).providerTraceId;
-    } catch {
-      const r2 = await verifyNICE({ name, birth, phone, carrier });
-      verified = r2.verified; providerTraceId = (r2 as any).providerTraceId;
+    const { name, birth, carrier, phone } = req.body ?? {};
+    if (!name || !birth || !carrier || !phone) {
+      return res.fail(400, "VAL_400", "name, birth(YYYYMMDD), carrier, phone 필수입니다.");
     }
-    if (!verified) return res.fail("KYC_FAILED", "KYC verification failed", 403);
-    // TODO: update users table with kyc flags
-    return res.ok({ kyc: "verified", providerTraceId });
-  } catch (e:any) {
-    return res.fail("KYC_PROVIDER_ERROR", e.message || "KYC error", 502);
+
+    const age = calcAgeFromBirthYYYYMMDD(birth);
+    if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYYMMDD 입니다.");
+    if (age < 50) return res.fail(403, "KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.");
+
+    const result = await verifyKyc({ name, birth, carrier, phone });
+    if (!result.ok) {
+      const code = result.reason === "TEMPORARY_FAILURE" ? 502 : 401;
+      return res.fail(code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH",
+        result.reason === "TEMPORARY_FAILURE" ? "외부 연동 장애/타임아웃" : "본인정보가 일치하지 않습니다.");
+    }
+
+    const userId = (req as any).user?.uid;
+    await updateKycStatus(Number(userId), result.provider);
+
+    return res.ok({
+      verified: true,
+      provider: result.provider,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    next(e);
   }
 });
 
-export default router;
+export { router as kycRouter };

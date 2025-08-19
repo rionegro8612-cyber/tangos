@@ -1,18 +1,28 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    // 개발환경(localhost)일 때만 API 서버로 프록시
-    if (process.env.NODE_ENV !== "production") {
-      return [
-        {
-          source: "/api/v1/:path*",
-          destination: "http://localhost:4100/api/v1/:path*", // ← localhost 고정
-        },
-      ];
-    }
-    // 프로덕션 환경에서는 별도 API Gateway나 도메인을 사용
-    return [];
+    // 프로덕션에서는 환경변수 기반으로 프록시 대상 지정
+    // 예: API_PROXY_TARGET="https://api.tango.app"
+    const target =
+      process.env.NODE_ENV === "production"
+        ? process.env.API_PROXY_TARGET
+        : "http://localhost:4100";
+
+    // target이 없으면 리라이트 비활성화(직접 절대경로 호출 사용)
+    if (!target) return [];
+
+    // /api/* → 백엔드로 프록시 (쿠키는 3000 오리진에 귀속되어 자동 동봉됨)
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${target}/api/:path*`,
+      },
+    ];
   },
+
+  // 필요시: 빌드 타임 환경에 따라 베이스패스/출력 경로 설정 가능
+  // basePath: "",
+  // output: "standalone",
 };
 
 export default nextConfig;
