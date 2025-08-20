@@ -4,7 +4,7 @@ declare global {
   namespace Express {
     interface Response {
       ok<T = unknown>(data: T, message?: string, code?: string): void;
-      fail(code: string, message: string, status?: number, data?: any): void;
+      fail(status: number, code: string, message: string, data?: any): void;
     }
   }
 }
@@ -21,7 +21,7 @@ export function responseMiddleware(req: Request, res: Response, next: NextFuncti
     });
   };
 
-  res.fail = function (code: string, message: string, status = 400, data: any = null) {
+  res.fail = function (status: number, code: string, message: string, data: any = null) {
     res.status(status).json({
       success: false,
       code,

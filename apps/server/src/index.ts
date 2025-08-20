@@ -8,6 +8,7 @@ import cookieParser from "cookie-parser";
 import { router } from "./apiRouter";
 import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
+import { setupCleanupScheduler } from "./lib/cleanup";
 
 const app = express();
 app.disable("x-powered-by");
@@ -58,35 +59,36 @@ app.use(standardErrorHandler);
 // ▼ 개발 시 등록된 라우트 로그
 if (process.env.NODE_ENV !== "production") {
   const logRoutes = () => {
-    type Row = { method: string; path: string };
-    const rows: Row[] = [];
-    const regexpToPath = (re?: RegExp): string => {
-      if (!re) return "";
-      const src = re.source
-        .replace("\\/?(?=\\/|$)", "")
-        .replace("^\\/", "/")
-        .replace(/\\\//g, "/")
-        .replace(/[\^\$]/g, "");
-      return src;
-    };
-    const walk = (stack: any[], prefix = "") => {
-      stack.forEach((layer) => {
-        if (layer?.route) {
-          const p = prefix + layer.route.path;
-          rows.push({ method: Object.keys(layer.route.methods)[0]?.toUpperCase(), path: p });
-        } else if (layer?.name === "router" && layer?.handle?.stack) {
-          const pfx = prefix + regexpToPath(layer.regexp);
-          walk(layer.handle.stack, pfx);
-        }
-      });
-    };
-    // @ts-ignore
-    walk(app._router?.stack || []);
-    const filtered = rows
-      .filter((r) => r.path.startsWith(API_BASE))
-      .sort((a, b) => (a.path === b.path ? a.method.localeCompare(b.method) : a.path.localeCompare(b.path)));
     console.log("\n[dev] Registered routes:");
-    console.table(filtered);
+    
+    // 간단한 방법: apiRouter의 라우트 정보 직접 출력
+    console.log("📋 API Router Info:");
+    console.log(`- Base path: ${API_BASE}`);
+    console.log(`- Router stack length: ${router.stack.length}`);
+    
+    // 각 라우터별 정보 출력
+    router.stack.forEach((layer: any, index: number) => {
+      if (layer.name === 'router') {
+        console.log(`- Router ${index + 1}: ${layer.regexp?.source || 'unknown'}`);
+        if (layer.handle?.stack) {
+          console.log(`  └─ Sub-routes: ${layer.handle.stack.length}`);
+        }
+      }
+    });
+    
+    console.log("\n🔍 Manual route check:");
+    console.log("GET  /api/v1/_ping");
+    console.log("POST /api/v1/auth/send-sms");
+    console.log("POST /api/v1/auth/verify-login");
+    console.log("GET  /api/v1/auth/me");
+    console.log("POST /api/v1/auth/refresh");
+    console.log("POST /api/v1/auth/logout");
+    console.log("POST /api/v1/auth/register/start");
+    console.log("POST /api/v1/auth/register/verify");
+    console.log("POST /api/v1/auth/register/complete");
+    console.log("GET  /api/v1/profile/nickname/check");
+    console.log("POST /api/v1/profile/nickname");
+    console.log("POST /api/v1/profile/region");
   };
   setTimeout(logRoutes, 200);
 }
@@ -96,4 +98,5 @@ console.log(`[env] PORT=${process.env.PORT ?? "(undefined)"} → use ${port}`);
 app.listen(port, () => {
   console.log(`[server] listening on http://localhost:${port}`);
   console.log("=== SERVER STARTED ===", new Date().toISOString());
+  setupCleanupScheduler();
 });

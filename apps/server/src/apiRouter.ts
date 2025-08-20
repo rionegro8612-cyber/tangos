@@ -13,7 +13,7 @@ import { profileRouter } from "./routes/profile";
 export const router = Router();
 
 // 기존
-router.use("/auth", loginRouter);    // /api/v1/auth/verify-code (로그인용)
+router.use("/auth", loginRouter);    // /api/v1/auth/send-sms, /verify-login, /me
 router.use("/auth", refreshRouter);  // /api/v1/auth/refresh
 router.use("/auth", logoutRouter);   // /api/v1/auth/logout
 router.use("/auth", kycRouter);      // /api/v1/auth/kyc/*

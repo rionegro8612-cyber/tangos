@@ -11,12 +11,12 @@ export default function requireAuth(req: Request, res: Response, next: NextFunct
       if (h.startsWith("Bearer ")) token = h.slice(7);
     }
     if (!token) {
-      return res.status(401).json({ success: false, code: "UNAUTHORIZED", message: "no token", data: null, requestId: (req as any).id });
+      return res.fail(401, "UNAUTHORIZED", "missing token");
     }
     const decoded = verifyAccessToken(token);
     (req as any).user = decoded;
     next();
   } catch (e: any) {
-    return res.status(401).json({ success: false, code: "UNAUTHORIZED", message: e?.message || "invalid token", data: null, requestId: (req as any).id });
+    return res.fail(401, "UNAUTHORIZED", e?.message || "unauthorized");
   }
 }

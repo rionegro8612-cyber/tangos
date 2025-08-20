@@ -22,29 +22,35 @@ export async function findOrCreateUserByPhoneE164(phoneE164: string) {
 
 /**
  * ✅ 프로필을 프런트 친화적 camelCase로 alias
- * 필요 시 KYC 필드도 함께 반환
+ * 실제 users 테이블 스키마에 맞춤
  */
 export async function getUserProfile(userId: number) {
   const rows = await query<{
     id: number;
     phone: string;
     nickname: string | null;
-    isKycVerified: boolean;
-    kycVerifiedAt: string | null;
-    lastLoginAt: string | null;
+    isVerified: boolean;
+    kycProvider: string | null;
+    kycVerified: boolean;
+    kycCheckedAt: string | null;
+    birthDate: string | null;
+    age: number | null;
     createdAt: string;
-    updatedAt: string | null;
+    updatedAt: string;
   }>(
     `
     SELECT
       id,
       phone_e164_norm        AS phone,
       nickname               AS nickname,
-      COALESCE(is_kyc_verified, FALSE) AS "isKycVerified",
-      kyc_verified_at        AS "kycVerifiedAt",
-      last_login_at          AS "lastLoginAt",
-      created_at             AS "createdAt",
-      updated_at             AS "updatedAt"
+      is_verified            AS "isVerified",
+      kyc_provider          AS "kycProvider",
+      kyc_verified          AS "kycVerified",
+      kyc_checked_at        AS "kycCheckedAt",
+      birth_date            AS "birthDate",
+      age                   AS age,
+      created_at            AS "createdAt",
+      updated_at            AS "updatedAt"
     FROM users
     WHERE id = $1
     `,

@@ -1,10 +1,22 @@
 // tango-web/src/lib/api.ts
 
-// 기본은 "같은 오리진"(= Next.js dev 서버 3000)
-// 서버(4100)로 직접 붙이고 싶으면 .env.local에 NEXT_PUBLIC_API_BASE_URL=... 넣으세요.
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+// 새로운 API_BASE 설정 (기존과 통합)
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
 
-type StandardResponse<T = unknown> = {
+// 기존 API_BASE (하위 호환성 유지)
+const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+
+// 새로운 StandardResponse 타입 (기존과 통합)
+export type StandardResponse<T> = {
+  success: boolean;
+  code: string;
+  message: string;
+  data: T;
+  requestId: string;
+};
+
+// 기존 StandardResponse 타입 (하위 호환성 유지)
+type StandardResponseLegacy<T = unknown> = {
   success: boolean;
   code?: string;
   message?: string;
@@ -12,10 +24,40 @@ type StandardResponse<T = unknown> = {
   requestId?: string | null;
 };
 
+// 새로운 parse 함수
+async function parse<T>(res: Response): Promise<StandardResponse<T>> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid JSON: ${text}`);
+  }
+}
+
+// 새로운 api 함수
+export async function api<T>(path: string, init: RequestInit = {}): Promise<StandardResponse<T>> {
+  const res = await fetch(`${API_BASE}${path}`,
+    {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+      ...init,
+    }
+  );
+  const body = await parse<T>(res);
+  if (!res.ok || body.success === false) {
+    const m = body?.message || res.statusText;
+    const err = new Error(m);
+    (err as any).code = body?.code ?? `HTTP_${res.status}`;
+    throw err;
+  }
+  return body;
+}
+
+// 기존 함수들 (하위 호환성 유지)
 function buildUrl(path: string) {
   // 절대 URL이면 그대로, 상대경로면 API_BASE 붙임(기본은 빈 문자열 → 같은 오리진)
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE}${path}`;
+  return `${API_BASE_LEGACY}${path}`;
 }
 
 function isJson(res: Response) {
@@ -39,7 +81,7 @@ async function raw(path: string, init: RequestInit = {}) {
     headers: { "Content-Type": "application/json", ...(init.headers || {}) },
     ...init,
   });
-  const json = await safeJson<StandardResponse<any>>(res);
+  const json = await safeJson<StandardResponseLegacy<any>>(res);
   return { res, json };
 }
 
@@ -47,43 +89,43 @@ async function raw(path: string, init: RequestInit = {}) {
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
-): Promise<StandardResponse<T>> {
+): Promise<StandardResponseLegacy<T>> {
   const first = await raw(path, init);
   if (first.res.status !== 401) {
     // JSON이 아니어도 최소 형태로 맞춰 반환
-    return (first.json as StandardResponse<T>) ?? ({ success: first.res.ok, data: null } as any);
+    return (first.json as StandardResponseLegacy<T>) ?? ({ success: first.res.ok, data: null } as any);
   }
 
   // refresh 시도 (BFF에 없으면 404/널이어도 무시)
   const r = await raw("/api/v1/auth/refresh", { method: "POST" });
   if (r.res.ok && r.json?.success) {
     const again = await raw(path, init);
-    return (again.json as StandardResponse<T>) ?? ({ success: again.res.ok, data: null } as any);
+    return (again.json as StandardResponseLegacy<T>) ?? ({ success: again.res.ok, data: null } as any);
   }
 
-  return (first.json as StandardResponse<T>) ?? ({ success: false, data: null } as any);
+  return (first.json as StandardResponseLegacy<T>) ?? ({ success: false, data: null } as any);
 }
 
 // ================= Auth =================
 
 export async function sendSms(phone: string, opts?: { dev?: boolean }) {
   // ✅ dev는 쿼리 말고 body로 넘김 (BFF 라우트와 일치)
-  return apiFetch<{ phoneE164: string; expiresInSec: number; devCode?: string }>(
+  return apiFetch<{ issued: boolean; ttlSec: number; devCode?: string }>(
     "/api/v1/auth/send-sms",
     { method: "POST", body: JSON.stringify({ phone, ...(opts?.dev ? { dev: true } : {}) }) },
   );
 }
 
 export async function verifyCode(phone: string, code: string) {
-  return apiFetch<{ user?: { id: string; phone_e164_norm: string; nickname: string | null } }>(
+  return apiFetch<{ userId: string; autoLogin: boolean }>(
     "/api/v1/auth/verify-code",
     { method: "POST", body: JSON.stringify({ phone, code }) },
   );
 }
 
 export async function me() {
-  // BFF 기준 경로
-  return apiFetch<{ user: { id: string; phone_e164_norm: string; nickname: string | null } }>(
+  // ✅ 백엔드 응답 형식에 맞춤
+  return apiFetch<{ id: number; phone: string; nickname: string | null }>(
     "/api/v1/auth/me",
   );
 }
@@ -101,7 +143,8 @@ export async function updateProfile(nickname: string | null) {
   );
 }
 
-export async function api(path: string, init?: RequestInit) {
+// 기존 api 함수 (하위 호환성 유지)
+export async function apiLegacy(path: string, init?: RequestInit) {
   const res = await fetch(`/api${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },

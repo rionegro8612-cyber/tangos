@@ -3,13 +3,17 @@
 import { create } from 'zustand';
 
 export type User = {
-  id: string | number;
-  phone_e164_norm: string;
-  nickname?: string | null;
-  last_login_at?: string | null;
-  created_at?: string;
-  // (UI 어딘가에서 phone을 참조한다면 주석 해제)
-  // phone?: string | null;
+  id: number;
+  phone: string;
+  nickname: string | null;
+  isVerified: boolean;
+  kycProvider: string | null;
+  kycVerified: boolean;
+  kycCheckedAt: string | null;
+  birthDate: string | null;
+  age: number | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AuthState = {
@@ -33,8 +37,28 @@ const safeJson = async (res: Response) => {
   try { return JSON.parse(text); } catch { return null; }
 };
 
-const extractUser = (j: any): User | null =>
-  j?.data?.user ?? j?.user ?? (typeof j?.data === 'object' ? j.data : null) ?? null;
+const extractUser = (j: any): User | null => {
+  // 백엔드 응답 형식에 맞춤
+  const userData = j?.data ?? j;
+  if (!userData || typeof userData !== 'object') return null;
+  
+  // 필수 필드 확인
+  if (typeof userData.id !== 'number') return null;
+  
+  return {
+    id: userData.id,
+    phone: userData.phone ?? '',
+    nickname: userData.nickname ?? null,
+    isVerified: userData.isVerified ?? false,
+    kycProvider: userData.kycProvider ?? null,
+    kycVerified: userData.kycVerified ?? false,
+    kycCheckedAt: userData.kycCheckedAt ?? null,
+    birthDate: userData.birthDate ?? null,
+    age: userData.age ?? null,
+    createdAt: userData.createdAt ?? new Date().toISOString(),
+    updatedAt: userData.updatedAt ?? new Date().toISOString(),
+  };
+};
 
 export const useAuthStore = create<AuthState>((set: (state: Partial<AuthState>) => void) => ({
   ready: false,

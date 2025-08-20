@@ -19,21 +19,25 @@ router.post("/api/v1/auth/kyc/pass", authRequired, async (req: Request, res: Res
     if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYYMMDD 입니다.");
     if (age < 50) return res.fail(403, "KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.");
 
-    const result = await verifyKyc({ name, birth, carrier, phone });
-    if (!result.ok) {
-      const code = result.reason === "TEMPORARY_FAILURE" ? 502 : 401;
-      return res.fail(code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH",
-        result.reason === "TEMPORARY_FAILURE" ? "외부 연동 장애" : "본인정보 불일치");
+    try {
+      const result = await verifyKyc({ name, birth, carrier, phone });
+      if (!result.ok) {
+        const code = result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH";
+        const status = result.reason === "TEMPORARY_FAILURE" ? 502 : 401;
+        return res.fail(status, code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH");
+      }
+
+      const userId = (req as any).user?.uid;
+      await updateKycStatus(Number(userId), result.provider);
+
+      return res.ok({
+        verified: true,
+        provider: result.provider,
+        checkedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      next(e);
     }
-
-    const userId = (req as any).user?.uid;
-    await updateKycStatus(Number(userId), result.provider);
-
-    return res.ok({
-      verified: true,
-      provider: result.provider,
-      checkedAt: new Date().toISOString(),
-    });
   } catch (e) {
     next(e);
   }

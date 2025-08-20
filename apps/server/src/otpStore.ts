@@ -25,7 +25,7 @@ type OtpRecord = {
     return { ok: waitMs <= 0, waitMs: Math.max(0, waitMs) };
   }
   
-  export function putCode(phone: string, code: string) {
+  export function putCode(phone: string, code: string, purpose?: string) {
     const now = Date.now();
     const rec: OtpRecord = {
       code,
@@ -34,7 +34,15 @@ type OtpRecord = {
       lastSentAt: now,
       lockedUntil: undefined,
     };
-    store.set(phone, rec);
+    
+    // 목적별로 다른 키 사용
+    const key = purpose ? `${purpose}:${phone}` : phone;
+    if (purpose) {
+      purposeStore.set(key, rec);
+    } else {
+      store.set(key, rec);
+    }
+    
     return rec;
   }
   
@@ -69,12 +77,18 @@ type OtpRecord = {
     return { TTL_SEC, RESEND_COOLDOWN_SEC, MAX_ATTEMPTS, LOCK_MIN };
   }
 
+// ✅ 목적별 OTP 스토어 분리
+const purposeStore = new Map<string, OtpRecord>();
+
 export function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export function verifyCode(phone: string, code: string): boolean {
-  const rec = store.get(phone);
+export function verifyCode(phone: string, code: string, purpose?: string): boolean {
+  const key = purpose ? `${purpose}:${phone}` : phone;
+  const targetStore = purpose ? purposeStore : store;
+  
+  const rec = targetStore.get(key);
   if (!rec) return false;
   if (rec.lockedUntil && Date.now() < rec.lockedUntil) return false;
   if (Date.now() > rec.expiresAt) return false;
@@ -82,7 +96,9 @@ export function verifyCode(phone: string, code: string): boolean {
     incAttempt(phone);
     return false;
   }
-  clear(phone);
+  
+  // 목적별 스토어에서 제거
+  targetStore.delete(key);
   return true;
 }
 

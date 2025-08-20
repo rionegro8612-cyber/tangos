@@ -5,9 +5,9 @@ import { findByJti, revokeAllForUser, revokeJti, saveNewRefreshToken } from "../
 
 export const refreshRouter = Router();
 
-refreshRouter.post("/auth/refresh", async (req, res) => {
+refreshRouter.post("/refresh", async (req, res) => {
   const rt = req.cookies?.[REFRESH_COOKIE] as string | undefined;
-  if (!rt) return res.fail("AUTH_NO_RT", "리프레시 토큰이 없습니다.", 401);
+  if (!rt) return res.fail(401, "AUTH_NO_RT", "리프레시 토큰이 없습니다.");
 
   try {
     const payload = verifyRefreshToken(rt); // { uid, jti }
@@ -16,12 +16,12 @@ refreshRouter.post("/auth/refresh", async (req, res) => {
     if (!record || record.revoked) {
       await revokeAllForUser(Number(payload.uid));
       clearAuthCookies(res);
-      return res.fail("AUTH_RT_REUSE", "세션 재인증이 필요합니다.", 401);
+      return res.fail(401, "AUTH_RT_REUSE", "세션 재인증이 필요합니다.");
     }
     if (record.token_hash !== sha256(rt)) {
       await revokeAllForUser(Number(payload.uid));
       clearAuthCookies(res);
-      return res.fail("AUTH_RT_TAMPERED", "세션 재인증이 필요합니다.", 401);
+      return res.fail(401, "AUTH_RT_TAMPERED", "세션 재인증이 필요합니다.");
     }
 
     const newId = newJti();
@@ -41,6 +41,6 @@ refreshRouter.post("/auth/refresh", async (req, res) => {
     return res.ok({ refreshed: true }, "OK");
   } catch {
     clearAuthCookies(res);
-    return res.fail("AUTH_RT_INVALID", "유효하지 않은 리프레시 토큰입니다.", 401);
+    return res.fail(401, "AUTH_RT_INVALID", "유효하지 않은 리프레시 토큰입니다.");
   }
 });

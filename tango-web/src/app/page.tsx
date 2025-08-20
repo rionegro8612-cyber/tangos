@@ -37,7 +37,9 @@ export default function ProfilePage() {
     const ctl = new AbortController();
 
     (async () => {
+      // 이미 사용자 정보가 있으면 API 호출하지 않음
       if (user) return;
+      
       setMeLoading(true);
       try {
         const res = await fetch(`${apiBase}/api/v1/auth/me`, {
@@ -48,7 +50,12 @@ export default function ProfilePage() {
         if (!alive) return;
 
         if (!res.ok) {
-          router.replace('/login');
+          // 401이면 로그인 페이지로, 다른 에러면 콘솔에 로그
+          if (res.status === 401) {
+            router.replace('/login');
+          } else {
+            console.error('Profile fetch failed:', res.status, res.statusText);
+          }
           return;
         }
 
@@ -57,10 +64,17 @@ export default function ProfilePage() {
         const json: AnyJson = text ? JSON.parse(text) : null;
 
         const u = pickUser(json);
-        if (u) setUser(u);
-        else router.replace('/login');
-      } catch {
-        if (alive) router.replace('/login');
+        if (u) {
+          setUser(u);
+        } else {
+          console.error('User data not found in response:', json);
+          router.replace('/login');
+        }
+      } catch (error) {
+        if (alive) {
+          console.error('Profile fetch error:', error);
+          router.replace('/login');
+        }
       } finally {
         if (alive) setMeLoading(false);
       }
@@ -116,19 +130,15 @@ export default function ProfilePage() {
           </div>
           <div>
             <span className="text-gray-500">전화번호</span> :{' '}
-            <b>{user.phone_e164_norm ?? (user as any).phone ?? '-'}</b>
+            <b>{user.phone ?? '-'}</b>
           </div>
           <div>
             <span className="text-gray-500">닉네임</span> :{' '}
             <b>{user.nickname ?? '-'}</b>
           </div>
           <div>
-            <span className="text-gray-500">마지막 로그인</span> :{' '}
-            <b>{user.last_login_at ?? '-'}</b>
-          </div>
-          <div>
             <span className="text-gray-500">가입일</span> :{' '}
-            <b>{user.created_at ?? '-'}</b>
+            <b>{user.createdAt ?? '-'}</b>
           </div>
         </div>
       ) : (

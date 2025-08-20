@@ -6,6 +6,18 @@ import { useRouter } from "next/navigation";
 import { sendSms, verifyCode, me } from "@/src/lib/api";
 import { useAuthStore } from "@/src/store/auth";
 
+// 🆕 새로운 API 함수 사용 옵션 (선택사항)
+// import { api, StandardResponse } from "@/lib/api";
+// 
+// 사용 예시:
+// const res = await api<{issued:boolean; ttlSec:number; devCode?:string}>("/auth/send-sms", {
+//   method: "POST", body: JSON.stringify({ phone })
+// });
+// 
+// const res = await api<{ userId:number; autoLogin:boolean }>("/auth/verify-login", {
+//   method: "POST", body: JSON.stringify({ phone, code })
+// });
+
 function normalizeKrPhone(input: string): string {
   const d = (input || "").replace(/\D/g, "");
   if (!d) return "";
@@ -89,31 +101,28 @@ export default function LoginPage() {
     setVerifying(true);
     try {
       // ✅ 쿠키를 받으려면 verifyCode 내부 fetch도 credentials:'include' 여야 합니다.
-      await verifyCode(raw, c);
+      // 현재: /api/v1/auth/verify-code (백엔드 경로와 일치)
+      // 참고: 새로운 api 함수 사용 시 /auth/verify-login으로 변경 가능
+      const verifyResult = await verifyCode(raw, c);
+      
+      // ✅ 백엔드 응답에서 userId 확인
+      if (verifyResult?.data?.userId) {
+        // 로그인 성공 후 사용자 정보 가져오기
+        let u: any = null;
+        try {
+          const r1: any = await me();          // /api/v1/auth/me
+          u = r1?.data ?? null;
+        } catch { /* ignore */ }
 
-      // 1) 기본 me()
-      let u: any = null;
-      try {
-        const r1: any = await me();          // 보통 /api/v1/auth/me
-        u = r1?.data?.user ?? null;
-      } catch { /* ignore */ }
-
-      // 2) 404/경로차이 대비 폴백: /api/v1/me
-      if (!u) {
-        const r2 = await fetch(`${API_BASE}/api/v1/me`, { credentials: "include" }).catch(() => null as any);
-        if (r2 && r2.ok) {
-          const txt = await r2.text();
-          const j = txt ? JSON.parse(txt) : null;
-          u = pickUser(j);
+        // ✅ 유저가 확실히 생겼을 때만 /profile로 이동 (튕김 방지)
+        if (u) {
+          setUser(u);
+          router.replace("/profile");
+        } else {
+          alert("로그인 세션이 확인되지 않았습니다. 쿠키 설정을 확인해주세요.");
         }
-      }
-
-      // ✅ 유저가 확실히 생겼을 때만 /profile로 이동 (튕김 방지)
-      if (u) {
-        setUser(u);
-        router.replace("/profile");
       } else {
-        alert("로그인 세션이 확인되지 않았습니다. 쿠키 설정을 확인해주세요.");
+        alert("로그인에 실패했습니다. 인증번호를 확인해주세요.");
       }
     } catch (e: any) {
       alert(e?.message || "인증에 실패했습니다.");
@@ -194,6 +203,17 @@ export default function LoginPage() {
           </button>
         </section>
       )}
+
+      {/* 회원가입 시작 버튼 */}
+      <div className="text-center">
+        <p className="text-sm text-gray-600 mb-3">아직 계정이 없으신가요?</p>
+        <button
+          className="w-full rounded border-2 border-gray-300 px-4 py-2 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+          onClick={() => router.push("/register/phone")}
+        >
+          회원가입 시작하기
+        </button>
+      </div>
     </main>
   );
 }
