@@ -29,3 +29,11 @@ apps/server/.env
 apps/server/.env.local
 apps/server/.env.prod
 tango-web/.env*
+node_modules/
+.env
+tango-web/.env
+apps/server/.env
+tango-web/.env.local
+**/.DS_Store
+pgdata/
+dist/

@@ -1,22 +1,49 @@
 import { Router } from "express";
-import { searchAddressKakao } from "../lib/vendors/kakaoMaps";
-import { searchAddressVWorld } from "../lib/vendors/vworld";
+import { searchLocation } from "../services/location";
 
 const router = Router();
 
-// GET /api/v1/location/search?q=...
+// 위치 검색 API
 router.get("/search", async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return res.fail("INVALID_ARG", "q is required", 400);
   try {
-    let result = await searchAddressKakao(q);
-    if (!result.items?.length) {
-      result = await searchAddressVWorld(q);
+    const q = String(req.query.q || "");
+    if (!q.trim()) {
+      return res.fail(400, "BAD_REQUEST", "q 파라미터가 필요합니다");
     }
-    return res.ok({ items: result.items, providerTraceId: result.providerTraceId });
-  } catch (e:any) {
-    return res.fail("GEO_LOOKUP_FAILED", e.message || "geo lookup failed", 502);
+    
+    const items = await searchLocation(q);
+    
+    // 프론트 표준화: label/code/lat/lng
+    const normalized = items.map(it => ({
+      label: it.label,
+      code: it.code ?? null,
+      lat: it.lat ?? null,
+      lng: it.lng ?? null,
+      source: it.source
+    }));
+    
+    return res.ok({ items: normalized }, "OK");
+  } catch (error) {
+    console.error("[location] 검색 오류:", error);
+    return res.fail(500, "INTERNAL_ERROR", "위치 검색 중 오류가 발생했습니다");
   }
 });
 
-export default router;
+// 선택 결과 저장 (유저 바인딩은 인증 미들웨어 뒤에서 처리)
+router.post("/code", async (req, res) => {
+  try {
+    const { label, code, lat, lng } = req.body || {};
+    if (!label) {
+      return res.fail(400, "BAD_REQUEST", "label이 필요합니다");
+    }
+    
+    // TODO: users.profile.region_code / region_label 업데이트 (트랜잭션)
+    // 현재는 성공 응답만 반환
+    return res.ok({ saved: true }, "OK");
+  } catch (error) {
+    console.error("[location] 저장 오류:", error);
+    return res.fail(500, "INTERNAL_ERROR", "위치 정보 저장 중 오류가 발생했습니다");
+  }
+});
+
+export { router as locationRouter };

@@ -17,20 +17,47 @@ profileRouter.get("/profile/nickname/check", async (req, res) => {
 profileRouter.post("/profile/nickname", authRequired, async (req, res) => {
   const { nickname } = req.body ?? {};
   if (!nickname) return res.fail(400, "VAL_400", "nickname 필수");
-  // basic policy: length 2-20
-  if (nickname.length < 2 || nickname.length > 20) return res.fail(400, "VAL_400", "닉네임 길이 2~20");
-  const exists = await query(`SELECT 1 FROM users WHERE nickname = $1`, [nickname]);
+  
+  // 닉네임 형식 검증: 2~12자, 한/영/숫자/_
+  if (!/^[\w가-힣]{2,12}$/.test(nickname)) {
+    return res.fail(400, "BAD_REQUEST", "닉네임 형식 오류(2~12자, 한/영/숫자/_)");
+  }
+  
+  // 중복 체크 (자신 제외)
+  const exists = await query(
+    `SELECT 1 FROM users WHERE nickname = $1 AND id != $2`, 
+    [nickname, (req as any).user.id]
+  );
   if (exists.length) return res.fail(409, "NICKNAME_TAKEN", "이미 사용 중인 닉네임");
-  await query(`UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2`, [nickname, (req as any).user.uid]);
-  return res.ok({ ok: true });
+  
+  await query(
+    `UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2`, 
+    [nickname, (req as any).user.id]
+  );
+  return res.ok({ success: true }, "닉네임이 저장되었습니다.");
 });
 
-/** POST /api/v1/profile/region { regionCode, regionLabel } */
+/** POST /api/v1/profile/region { label, code?, lat?, lng? } */
 profileRouter.post("/profile/region", authRequired, async (req, res) => {
-  const { regionCode, regionLabel } = req.body ?? {};
-  if (!regionCode || !regionLabel) return res.fail(400, "VAL_400", "regionCode, regionLabel 필수");
-  await query(`UPDATE users SET region_code = $1, region_label = $2, updated_at = NOW() WHERE id = $3`,
-    [regionCode, regionLabel, (req as any).user.uid]);
-  return res.ok({ ok: true });
+  const { label, code, lat, lng } = req.body ?? {};
+  if (!label) return res.fail(400, "BAD_REQUEST", "label 필수");
+  
+  await query(
+    `UPDATE users SET 
+      region_label = $1, 
+      region_code = $2, 
+      region_lat = $3, 
+      region_lng = $4,
+      updated_at = NOW()
+     WHERE id = $5`,
+    [
+      String(label),
+      code ? String(code) : null,
+      lat ?? null,
+      lng ?? null,
+      (req as any).user.id
+    ]
+  );
+  return res.ok({ success: true }, "지역 정보가 저장되었습니다.");
 });
 

@@ -1,17 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useSignupDraft } from "@/src/lib/useSignupDraft";
 
 export default function RegisterPhonePage() {
   const r = useRouter();
-  const { draft, updateDraft } = useSignupDraft();
-  const [phone, setPhone] = useState(draft.phone ?? "");
+  const [phone, setPhone] = useState("");
 
   function next(e: React.FormEvent) {
     e.preventDefault();
     if (!phone) return;
-    updateDraft({ phone });
+    sessionStorage.setItem("phone", phone);
     r.push("/register/carrier");
   }
 

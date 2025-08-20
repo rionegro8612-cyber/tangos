@@ -1,68 +1,56 @@
 "use client";
-import { useSignupDraft } from "@/src/lib/useSignupDraft";
-import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { api } from "@/src/lib/api";
 
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
 
-export default function RegisterInfoPage() {
-  const r = useRouter();
-  const { draft, updateDraft, clearDraft } = useSignupDraft();
-  const [name, setName] = useState(draft.name ?? "");
-  const [birth, setBirth] = useState(draft.birth ?? "");
-  const [gender, setGender] = useState(draft.gender ?? "");
-  const [tos, setTos] = useState(!!draft.terms?.tos);
-  const [privacy, setPrivacy] = useState(!!draft.terms?.privacy);
-  const [marketing, setMarketing] = useState(!!draft.terms?.marketing);
+export default function RegisterInfoPage(){
+  const [name, setName] = useState("");
+  const [birth, setBirth] = useState(""); // YYYY-MM-DD
+  const [gender, setGender] = useState<"M"|"F"|"" >("");
+  const [terms, setTerms] = useState({ tos:false, privacy:false });
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  useEffect(()=>{ 
-    if (!draft.phone || !draft.carrier) r.replace("/register/phone"); 
-  }, [draft.phone, draft.carrier, r]);
+  // 전화번호 인증 확인
+  useEffect(() => {
+    const phone = sessionStorage.getItem("phone");
+    const phoneVerified = sessionStorage.getItem("phoneVerified");
+    
+    if (!phone || !phoneVerified) {
+      location.href = "/register/phone";
+    }
+  }, []);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg("");
-    if (!tos || !privacy) { setMsg("약관 동의가 필요합니다."); return; }
-    setLoading(true);
-    try {
-      const res = await api<{ userId: number; autoLogin: boolean }>("/auth/register/submit", {
-        method: "POST", body: JSON.stringify({
-          phone: draft.phone, name, birth, gender: gender || undefined, carrier: draft.carrier,
-          terms: { tos, privacy, marketing }
-        })
-      });
-      updateDraft({ name, birth, gender: gender as any, terms: { tos, privacy, marketing } });
-      // 자동 로그인 쿠키 세팅됨 → 닉네임으로 이동
-      r.push("/onboarding/nickname");
-    } catch (err:any) {
-      const code = err.code;
-      if (code === "KYC_AGE_RESTRICTED") setMsg("50세 이상만 가입 가능합니다.");
-      else if (code === "KYC_MISMATCH") setMsg("본인 정보가 일치하지 않습니다.");
-      else if (code === "KYC_TEMPORARY_FAILURE") setMsg("본인인증 지연 중입니다. 잠시 후 다시 시도해주세요.");
-      else setMsg(err.message);
-    } finally { setLoading(false); }
-  }
+  const canSubmit = name && /^\d{4}-\d{2}-\d{2}$/.test(birth) && (gender==="M"||gender==="F") && terms.tos && terms.privacy;
 
+  const onSubmit = async () => {
+    const r = await fetch(`${BASE}/api/v1/auth/register/submit`, {
+      method:"POST", credentials:"include",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        phone: sessionStorage.getItem("phone"), // 이전 단계에 저장했다고 가정
+        name, birth, gender,
+        termsAccepted: [{key:"tos",version:"1.0.0"}, {key:"privacy",version:"1.0.0"}]
+      })
+    });
+    const j = await r.json();
+    if (j.success) location.href="/onboarding/nickname";
+    else setMsg(j.message || "가입에 실패했습니다.");
+  };
 
-return (
-<div className="max-w-md mx-auto p-6 space-y-4">
-<h1 className="text-2xl font-bold">기본 정보 입력</h1>
-<form className="space-y-3" onSubmit={onSubmit}>
-<input className="input input-bordered w-full" placeholder="이름" value={name} onChange={(e)=>setName(e.target.value)} required />
-<input className="input input-bordered w-full" placeholder="생년월일(YYYYMMDD)" value={birth} onChange={(e)=>setBirth(e.target.value)} required />
-<select className="select select-bordered w-full" value={gender} onChange={(e)=>setGender(e.target.value as "M" | "F" | "")}>
-<option value="">성별 선택(옵션)</option>
-<option value="M">남</option>
-<option value="F">여</option>
-</select>
-<label className="flex items-center gap-2"><input type="checkbox" checked={tos} onChange={e=>setTos(e.target.checked)} /> 이용약관 동의(필수)</label>
-<label className="flex items-center gap-2"><input type="checkbox" checked={privacy} onChange={e=>setPrivacy(e.target.checked)} /> 개인정보 처리방침 동의(필수)</label>
-<label className="flex items-center gap-2"><input type="checkbox" checked={marketing} onChange={e=>setMarketing(e.target.checked)} /> 마케팅 수신 동의(선택)</label>
-<button className="btn btn-primary w-full" disabled={loading}>가입 완료</button>
-</form>
-{msg && <p className="text-red-500 text-sm">{msg}</p>}
-</div>
-);
+  return (
+    <main className="mx-auto max-w-[430px] p-6">
+      <h1 className="text-xl font-bold mb-4">기본정보 입력</h1>
+      <input className="w-full border rounded p-3 mb-2" placeholder="이름" value={name} onChange={e=>setName(e.target.value)} />
+      <input className="w-full border rounded p-3 mb-2" placeholder="생년월일 (YYYY-MM-DD)" value={birth} onChange={e=>setBirth(e.target.value)} />
+      <div className="flex gap-3 mb-2">
+        <button className={`border rounded px-4 py-2 ${gender==="M"?"bg-black text-white":""}`} onClick={()=>setGender("M")}>남</button>
+        <button className={`border rounded px-4 py-2 ${gender==="F"?"bg-black text-white":""}`} onClick={()=>setGender("F")}>여</button>
+      </div>
+      <label className="block mb-1"><input type="checkbox" checked={terms.tos} onChange={e=>setTerms(s=>({...s,tos:e.target.checked}))} /> 이용약관 동의</label>
+      <label className="block mb-4"><input type="checkbox" checked={terms.privacy} onChange={e=>setTerms(s=>({...s,privacy:e.target.checked}))} /> 개인정보 처리방침 동의</label>
+
+      <button className="w-full rounded-xl p-3 bg-black text-white disabled:opacity-40" disabled={!canSubmit} onClick={onSubmit}>제출</button>
+      {msg && <p className="mt-3 text-sm text-red-600">{msg}</p>}
+    </main>
+  );
 }

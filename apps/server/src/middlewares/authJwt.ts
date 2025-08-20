@@ -2,6 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../lib/jwt';
 import { getAccessTokenFromCookies } from '../lib/cookies';
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: number };
+    }
+  }
+}
+
 export default async function authJwt(req: Request, res: Response, next: NextFunction) {
   try {
     // 1) 토큰 추출: Bearer 또는 쿠키(access_token)
@@ -22,7 +30,7 @@ export default async function authJwt(req: Request, res: Response, next: NextFun
     }
 
     // 3) 통과 → req.user에 식별자 저장
-    (req as any).user = { uid };
+    (req as any).user = { id: uid };
     next();
   } catch (e: any) {
     return res.status(401).json({ success:false, code:'BAD_TOKEN', message: e?.message || 'invalid token' });

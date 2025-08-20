@@ -1,50 +1,80 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { api } from "@/src/lib/api";
 import { useEffect, useMemo, useState } from "react";
 
-
-export default function NicknamePage() {
-const r = useRouter();
-const [nick, setNick] = useState("");
-const [available, setAvailable] = useState<boolean | null>(null);
-const [msg, setMsg] = useState("");
-
-
-useEffect(() => {
-const t = setTimeout(async () => {
-if (!nick) { setAvailable(null); return; }
-try {
-const res = await api<{ available: boolean }>(`/profile/nickname/check?value=${encodeURIComponent(nick)}`);
-setAvailable(res.data.available);
-} catch { setAvailable(null); }
-}, 500);
-return () => clearTimeout(t);
-}, [nick]);
-
-
-async function submit() {
-setMsg("");
-try {
-await api<{ ok: boolean }>("/profile/nickname", {
-method: "POST", body: JSON.stringify({ nickname: nick })
-});
-r.push("/onboarding/region");
-} catch (e:any) { setMsg(e.message); }
+async function checkNickname(value: string){
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
+  const res = await fetch(`${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}`, {
+    credentials: "include"
+  });
+  return res.json();
 }
 
+export default function NicknamePage(){
+  const [value, setValue] = useState("");
+  const [status, setStatus] = useState<"idle"|"checking"|"ok"|"dup"|"invalid">("idle");
+  const [msg, setMsg] = useState("");
 
-return (
-<div className="max-w-md mx-auto p-6 space-y-4">
-<h1 className="text-2xl font-bold">닉네임 설정</h1>
-<input className="input input-bordered w-full" value={nick} onChange={(e)=>setNick(e.target.value)} placeholder="닉네임" />
-{available!==null && (
-<p className={available?"text-green-600":"text-red-500"}>
-{available?"사용 가능한 닉네임입니다":"사용할 수 없는 닉네임이에요"}
-</p>
-)}
-<button className="btn btn-primary w-full" onClick={submit} disabled={!nick || available===false}>다음</button>
-{msg && <p className="text-red-500 text-sm">{msg}</p>}
-</div>
-);
+  // 규칙: 2~12자, 한/영/숫자/_(언더바) 허용
+  const valid = useMemo(() => /^[\w가-힣]{2,12}$/.test(value), [value]);
+
+  useEffect(() => {
+    if (!value) { setStatus("idle"); setMsg(""); return; }
+    if (!valid) { setStatus("invalid"); setMsg("닉네임은 2~12자, 한/영/숫자/_(언더바)만 가능"); return; }
+
+    setStatus("checking");
+    const t = setTimeout(async () => {
+      const j = await checkNickname(value);
+      const ok = j?.data?.available === true;
+      setStatus(ok ? "ok" : "dup");
+      setMsg(ok ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다.");
+    }, 500); // 500ms 디바운스
+
+    return () => clearTimeout(t);
+  }, [value, valid]);
+
+  const canNext = status === "ok";
+
+  const onNext = async () => {
+    if (!canNext) return;
+    
+    try {
+      const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
+      const res = await fetch(`${base}/api/v1/profile/nickname`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: value })
+      });
+      
+      const j = await res.json();
+      if (j.success) {
+        location.href = "/onboarding/region";
+      } else {
+        setMsg(j.message || "닉네임 저장에 실패했습니다.");
+      }
+    } catch (error) {
+      setMsg("닉네임 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  return (
+    <main className="mx-auto max-w-[430px] p-6">
+      <h1 className="text-xl font-bold mb-4">닉네임 설정</h1>
+      <input
+        className="w-full border rounded p-3"
+        value={value}
+        onChange={e=>setValue(e.target.value)}
+        placeholder="닉네임을 입력하세요 (2~12자)"
+      />
+      <p className={`mt-2 text-sm ${status==="ok"?"text-green-600":status==="dup"||status==="invalid"?"text-red-600":"text-gray-500"}`}>{msg}</p>
+
+      <button
+        className="mt-6 w-full rounded-xl p-3 bg-black text-white disabled:opacity-40"
+        disabled={!canNext}
+        onClick={onNext}
+      >
+        다음
+      </button>
+    </main>
+  );
 }

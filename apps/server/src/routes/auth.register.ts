@@ -42,11 +42,11 @@ registerRouter.post("/register/verify-code", async (req, res) => {
 });
 
 /** POST /api/v1/auth/register/submit
- *  Body: { phone, name, birth(YYYYMMDD), gender?, carrier, terms:{tos,privacy,marketing?} }
+ *  Body: { phone, name, birth(YYYY-MM-DD), gender, termsAccepted:[{key,version}] }
  */
 registerRouter.post("/register/submit", async (req, res) => {
-  const { phone, name, birth, gender, carrier, terms } = req.body ?? {};
-  if (!phone || !name || !birth || !carrier || !terms?.tos || !terms?.privacy) {
+  const { phone, name, birth, gender, termsAccepted } = req.body ?? {};
+  if (!phone || !name || !birth || !termsAccepted?.length) {
     return res.fail(400, "VAL_400", "필수 항목 누락");
   }
   if (await findByPhone(phone)) {
@@ -58,11 +58,24 @@ registerRouter.post("/register/submit", async (req, res) => {
     return res.fail(409, "REGISTER_FLOW_ERROR", "전화번호 검증이 선행되어야 합니다.");
   }
 
-  const age = calcAgeFromBirthYYYYMMDD(birth);
-  if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYYMMDD");
+  // birth 형식을 YYYY-MM-DD로 파싱
+  const birthDate = new Date(birth);
+  if (isNaN(birthDate.getTime())) {
+    return res.fail(400, "VAL_400", "birth 형식은 YYYY-MM-DD");
+  }
+  
+  const age = calcAgeFromBirthYYYYMMDD(birth.replace(/-/g, ''));
+  if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYY-MM-DD");
   if (age < 50) return res.fail(403, "KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.");
 
-  const kyc = await verifyKyc({ name, birth, carrier, phone });
+  // termsAccepted에서 필수 약관 확인
+  const hasTos = termsAccepted.some((t: { key: string; version: string }) => t.key === 'tos');
+  const hasPrivacy = termsAccepted.some((t: { key: string; version: string }) => t.key === 'privacy');
+  if (!hasTos || !hasPrivacy) {
+    return res.fail(400, "VAL_400", "tos, privacy 약관 동의 필수");
+  }
+
+  const kyc = await verifyKyc({ name, birth, carrier: session.carrier, phone });
   if (!kyc.ok) {
     const code = kyc.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH";
     const status = kyc.reason === "TEMPORARY_FAILURE" ? 502 : 401;
@@ -70,8 +83,12 @@ registerRouter.post("/register/submit", async (req, res) => {
   }
 
   const userId = await createUserWithKyc({
-    phone, name, birth, gender: gender ?? null, carrier,
-    consent: { tos: !!terms.tos, privacy: !!terms.privacy, marketing: !!terms.marketing },
+    phone, name, birth, gender: gender ?? null, carrier: session.carrier,
+    consent: { 
+      tos: hasTos, 
+      privacy: hasPrivacy, 
+      marketing: termsAccepted.some((t: { key: string; version: string }) => t.key === 'marketing') 
+    },
     kycProvider: kyc.provider
   });
 

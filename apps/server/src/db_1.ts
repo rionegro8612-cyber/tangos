@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../lib/db';
+import { pool } from './db';
 
 export const dbRouter = Router();
 
@@ -7,7 +7,7 @@ dbRouter.get('/ping', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
     res.json({ success: true, code: 'OK', message: 'db ok', data: { now: result.rows[0].now }, requestId: 'dev' });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ success: false, code: 'DB_ERROR', message: err.message, requestId: 'dev' });
   }
 });

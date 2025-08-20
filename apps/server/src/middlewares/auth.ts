@@ -13,15 +13,15 @@ function getTokenFromReq(req: Request): string | undefined {
 export function authRequired(req: Request, res: Response, next: NextFunction) {
   try {
     const token = getTokenFromReq(req);
-    if (!token) return res.fail("AUTH_401", "인증이 필요합니다.", 401);
+    if (!token) return res.fail(401, "AUTH_401", "인증이 필요합니다.");
     const payload = verifyAccessToken(token);
-    req.user = { uid: Number(payload.uid) };
+    req.user = { id: Number(payload.uid) };
     next();
   } catch {
-    return res.fail("AUTH_401", "유효하지 않은 토큰입니다.", 401);
+    return res.fail(401, "AUTH_401", "유효하지 않은 토큰입니다.");
   }
 }
 
 declare global {
-  namespace Express { interface Request { user?: { uid: number }; } }
+  namespace Express { interface Request { user?: { id: number }; } }
 }

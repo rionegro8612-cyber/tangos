@@ -91,10 +91,10 @@ loginRouter.post("/verify-code", async (req, res) => {
 
 // 세션 확인
 loginRouter.get("/me", authJwt, async (req, res) => {
-  if (!req.user?.uid) return res.fail(401, "UNAUTHORIZED", "로그인이 필요합니다.");
+  if (!req.user?.id) return res.fail(401, "UNAUTHORIZED", "로그인이 필요합니다.");
   
-  // uid로 사용자 조회 (uid는 number 타입)
-  const user = await getUserProfile(req.user.uid);
+  // id로 사용자 조회 (id는 number 타입)
+  const user = await getUserProfile(req.user.id);
   if (!user) return res.fail(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.");
   
   return res.ok({ 
