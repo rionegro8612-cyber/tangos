@@ -34,6 +34,7 @@
     "helmet": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
+    "node-cron": "^3.0.3",
     "pg": "^8.16.3",
     "redis": "^4.7.1",
     "twilio": "^5.8.0",
@@ -49,7 +50,6 @@
     "@types/pg": "^8.15.5",
     "@types/uuid": "^10.0.0",
     "dotenv-cli": "^10.0.0",
-    "node-cron": "^3.0.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2"

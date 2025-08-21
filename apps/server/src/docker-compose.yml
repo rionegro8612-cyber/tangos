@@ -18,7 +18,7 @@ services:
   
   server:
     build: .
-    env_file: /apps/server/.env
+    env_file: ../.env
     depends_on: ["db","redis"]
     ports: ["4100:4100"]
     command: ["npm","run","start"]

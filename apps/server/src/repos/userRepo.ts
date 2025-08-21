@@ -6,19 +6,18 @@ import { query } from "../db";
  *     CREATE UNIQUE INDEX IF NOT EXISTS ux_users_phone ON users(phone_e164_norm);
  */
 export async function findOrCreateUserByPhoneE164(phoneE164: string) {
-  const ENC_KEY = process.env.PHONE_ENC_KEY!;
   const rows = await query<{ id: string }>(
     `
-    INSERT INTO users (phone_e164_norm, phone_enc, created_at, updated_at)
-    VALUES ($1, pgp_sym_encrypt($1, $2), NOW(), NOW())
+    INSERT INTO users (phone_e164_norm, created_at, updated_at)
+    VALUES ($1::text, NOW(), NOW())
     ON CONFLICT (phone_e164_norm) DO UPDATE
-    SET phone_enc = COALESCE(users.phone_enc, pgp_sym_encrypt(EXCLUDED.phone_e164_norm, $2)),
-        updated_at = NOW()
+    SET updated_at = NOW()
     RETURNING id
     `,
-    [phoneE164, ENC_KEY]
+    [phoneE164]
   );
   // 대부분 1행이 반환됩니다. (충돌 시에도 RETURNING id 보장)
+  // phone_enc는 트리거가 자동으로 처리
   return rows[0].id;
 }
 
