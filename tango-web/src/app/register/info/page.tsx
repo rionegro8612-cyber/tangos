@@ -10,12 +10,12 @@ export default function RegisterInfoPage(){
   const [terms, setTerms] = useState({ tos:false, privacy:false });
   const [msg, setMsg] = useState("");
 
-  // 전화번호 인증 확인
+  // 전화번호와 통신사 확인
   useEffect(() => {
     const phone = sessionStorage.getItem("phone");
-    const phoneVerified = sessionStorage.getItem("phoneVerified");
+    const carrier = sessionStorage.getItem("carrier");
     
-    if (!phone || !phoneVerified) {
+    if (!phone || !carrier) {
       location.href = "/register/phone";
     }
   }, []);
@@ -27,14 +27,18 @@ export default function RegisterInfoPage(){
       method:"POST", credentials:"include",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
-        phone: sessionStorage.getItem("phone"), // 이전 단계에 저장했다고 가정
+        phone: sessionStorage.getItem("phone"),
         name, birth, gender,
         termsAccepted: [{key:"tos",version:"1.0.0"}, {key:"privacy",version:"1.0.0"}]
       })
     });
     const j = await r.json();
-    if (j.success) location.href="/onboarding/nickname";
-    else setMsg(j.message || "가입에 실패했습니다.");
+    if (j.success) {
+      // OTP 발송을 위해 verify 페이지로 이동
+      location.href="/register/verify";
+    } else {
+      setMsg(j.message || "가입에 실패했습니다.");
+    }
   };
 
   return (
@@ -49,7 +53,7 @@ export default function RegisterInfoPage(){
       <label className="block mb-1"><input type="checkbox" checked={terms.tos} onChange={e=>setTerms(s=>({...s,tos:e.target.checked}))} /> 이용약관 동의</label>
       <label className="block mb-4"><input type="checkbox" checked={terms.privacy} onChange={e=>setTerms(s=>({...s,privacy:e.target.checked}))} /> 개인정보 처리방침 동의</label>
 
-      <button className="w-full rounded-xl p-3 bg-black text-white disabled:opacity-40" disabled={!canSubmit} onClick={onSubmit}>제출</button>
+      <button className="w-full rounded-xl p-3 bg-black text-white disabled:opacity-40" disabled={!canSubmit} onClick={onSubmit}>다음</button>
       {msg && <p className="mt-3 text-sm text-red-600">{msg}</p>}
     </main>
   );
