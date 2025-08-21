@@ -10,6 +10,7 @@ import { kycRouter } from "./routes/kyc";
 import { registerRouter } from "./routes/auth.register";
 import profileRouter from "./routes/profile";
 import { locationRouter } from "./routes/location";
+import { authRouter as authMvpRouter } from "./routes/auth.mvp";
 
 export const router = Router();
 
@@ -21,8 +22,13 @@ router.use("/auth", kycRouter);      // /api/v1/auth/kyc/*
 
 // ★ 신규 회원가입/프로필 라우터 장착
 router.use("/auth", registerRouter); // /api/v1/auth/register/*
-router.use("/", profileRouter);      // /api/v1/profile/*
-router.use("/", locationRouter);     // /api/v1/location/*
+router.use("/auth", authMvpRouter);  // /api/v1/auth/* (send-sms, verify-code, logout, me)
+
+// ✅ 프로필 라우터 마운트
+router.use("/profile", profileRouter);
+
+// ✅ 위치 검색 라우터 마운트
+router.use("/location", locationRouter);
 
 router.get("/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
 
