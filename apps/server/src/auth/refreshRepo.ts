@@ -4,7 +4,7 @@ import { query } from "../db";
 const sha256hex = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
 export async function storeRefresh(
-  userId: number,
+  userId: string,
   token: string,
   expiresAtISO: string,
   ua?: string,
@@ -13,7 +13,7 @@ export async function storeRefresh(
   const hash = sha256hex(token);
   await query(
     `INSERT INTO auth_refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_addr)
-     VALUES ($1, $2, $3, $4, $5)`,
+     VALUES ($1::uuid, $2, $3, $4, $5)`,
     [userId, hash, expiresAtISO, ua ?? null, ip ?? null]
   );
 }
@@ -29,11 +29,11 @@ export async function revokeRefresh(token: string) {
   );
 }
 
-export async function isRefreshValid(userId: number, token: string): Promise<boolean> {
+export async function isRefreshValid(userId: string, token: string): Promise<boolean> {
   const hash = sha256hex(token);
-  const rows = await query<{ id: number }>(
+  const rows = await query<{ id: string }>(
     `SELECT id FROM auth_refresh_tokens
-      WHERE user_id = $1
+      WHERE user_id = $1::uuid
         AND token_hash = $2
         AND revoked_at IS NULL
         AND expires_at > NOW()
@@ -44,7 +44,7 @@ export async function isRefreshValid(userId: number, token: string): Promise<boo
 }
 
 export async function replaceRefresh(
-  userId: number,
+  userId: string,
   oldToken: string,
   newToken: string,
   expIso: string,
@@ -58,7 +58,7 @@ export async function replaceRefresh(
   await query(
     `UPDATE auth_refresh_tokens
         SET revoked_at = NOW()
-      WHERE user_id = $1
+      WHERE user_id = $1::uuid
         AND token_hash = $2
         AND revoked_at IS NULL`,
     [userId, oldHash]
@@ -67,7 +67,7 @@ export async function replaceRefresh(
   // 2) 새 refresh 토큰 저장
   await query(
     `INSERT INTO auth_refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_addr)
-     VALUES ($1, $2, $3, $4, $5)`,
+     VALUES ($1::uuid, $2, $3, $4, $5)`,
     [userId, newHash, expIso, userAgent, ip]
   );
 

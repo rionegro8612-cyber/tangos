@@ -9,7 +9,7 @@ const REFRESH_DAYS = Number(process.env.JWT_REFRESH_EXPIRES_DAYS || 30); // 30�
 
 /** JWT Payload 타입 */
 export interface JwtPayload {
-  uid: number;   // user id
+  uid: string;   // user id (UUID)
   jti: string;   // unique token id
   iat?: number;
   exp?: number;
@@ -27,7 +27,7 @@ export function sha256(input: string): string {
 }
 
 /** Access Token 발급 */
-export function signAccessToken(uid: number, jti: string): string {
+export function signAccessToken(uid: string, jti: string): string {
   const payload: JwtPayload = { uid, jti };
   return jwt.sign(payload, SECRET, {
     algorithm: "HS256",
@@ -37,7 +37,7 @@ export function signAccessToken(uid: number, jti: string): string {
 }
 
 /** Refresh Token 발급 */
-export function signRefreshToken(uid: number, jti: string): string {
+export function signRefreshToken(uid: string, jti: string): string {
   const payload: JwtPayload = { uid, jti };
   return jwt.sign(payload, SECRET, {
     algorithm: "HS256",

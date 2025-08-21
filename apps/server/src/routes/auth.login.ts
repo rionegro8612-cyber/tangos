@@ -22,7 +22,7 @@ loginRouter.post("/send-sms", async (req, res) => {
     console.log(`[DEV] 사용자 자동 생성: ${e164}`);
     // 간단한 사용자 생성 (실제로는 회원가입 플로우를 거쳐야 함)
     const { findOrCreateUserByPhoneE164 } = await import("../repos/userRepo");
-    const userId = await findOrCreateUserByPhoneE164(e164);
+    const userId: string = await findOrCreateUserByPhoneE164(e164);
     user = { id: userId };
   }
 
@@ -52,16 +52,16 @@ loginRouter.post("/verify-login", async (req, res) => {
   if (!user) return res.fail(404, "USER_NOT_FOUND", "가입된 사용자가 없습니다.");
 
   const jti = newJti();
-  const at  = signAccessToken(user.id, jti);
-  const rt  = signRefreshToken(user.id, jti);
+  const at  = signAccessToken(String(user.id), jti);
+  const rt  = signRefreshToken(String(user.id), jti);
   await saveNewRefreshToken({
-    jti, userId: user.id, token: rt,
+    jti, userId: String(user.id), token: rt,
     expiresAt: new Date(Date.now() + 30*24*60*60*1000),
     userAgent: req.headers["user-agent"]?.toString() ?? undefined,
     ip: req.ip ?? undefined,
   });
   setAuthCookies(res, at, rt);
-  return res.ok({ userId: user.id, autoLogin: true }, "LOGIN_OK");
+  return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
 // 프론트 요청 경로에 맞춰 /verify-code 추가 (verify-login과 동일)
@@ -77,16 +77,16 @@ loginRouter.post("/verify-code", async (req, res) => {
   if (!user) return res.fail(404, "USER_NOT_FOUND", "가입된 사용자가 없습니다.");
 
   const jti = newJti();
-  const at  = signAccessToken(user.id, jti);
-  const rt  = signRefreshToken(user.id, jti);
+  const at  = signAccessToken(String(user.id), jti);
+  const rt  = signRefreshToken(String(user.id), jti);
   await saveNewRefreshToken({
-    jti, userId: user.id, token: rt,
+    jti, userId: String(user.id), token: rt,
     expiresAt: new Date(Date.now() + 30*24*60*60*1000),
     userAgent: req.headers["user-agent"]?.toString() ?? undefined,
     ip: req.ip ?? undefined,
   });
   setAuthCookies(res, at, rt);
-  return res.ok({ userId: user.id, autoLogin: true }, "LOGIN_OK");
+  return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
 // 세션 확인

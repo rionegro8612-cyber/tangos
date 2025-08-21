@@ -17,11 +17,18 @@ services:
     command: ["redis-server","--appendonly","yes"]
   
   server:
-    build: .
-    env_file: /apps/server/.env
-    depends_on: ["db","redis"]
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/server/.env
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/tango
+      - REDIS_URL=redis://redis:6379
+      - PHONE_ENC_KEY=${PHONE_ENC_KEY}
+    depends_on: [db, redis]
     ports: ["4100:4100"]
-    command: ["npm","run","start"]
+    command: ["node","dist/index.js"]
 
 volumes:
   pgdata:

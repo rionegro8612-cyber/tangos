@@ -3,12 +3,12 @@ import { pool } from "../lib/db"; // 프로젝트 DB 클라이언트에 맞게 �
 import { sha256 } from "../lib/jwt";
 
 export async function saveNewRefreshToken(args: {
-  jti: string; userId: number; token: string; expiresAt: Date; userAgent?: string; ip?: string;
+  jti: string; userId: string; token: string; expiresAt: Date; userAgent?: string; ip?: string;
 }) {
   const hash = sha256(args.token);
   await pool.query(
     `INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at, revoked, user_agent, ip)
-     VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, FALSE, $5, $6)`,
+     VALUES ($1, $2::uuid, $3, CURRENT_TIMESTAMP, $4, FALSE, $5, $6)`,
     [args.jti, args.userId, hash, args.expiresAt, args.userAgent ?? null, args.ip ?? null]
   );
 }
@@ -26,6 +26,6 @@ export async function revokeJti(jti: string, replacedByJti?: string) {
   );
 }
 
-export async function revokeAllForUser(userId: number) {
-  await pool.query(`UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE`, [userId]);
+export async function revokeAllForUser(userId: string) {
+  await pool.query(`UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1::uuid AND revoked = FALSE`, [userId]);
 }

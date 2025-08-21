@@ -1,14 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../lib/jwt';
 import { getAccessTokenFromCookies } from '../lib/cookies';
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: { id: number };
-    }
-  }
-}
+import { validate as uuidValidate } from 'uuid';
 
 export default async function authJwt(req: Request, res: Response, next: NextFunction) {
   try {
@@ -23,14 +16,14 @@ export default async function authJwt(req: Request, res: Response, next: NextFun
 
     // 2) 검증 및 페이로드 파싱
     const payload: any = verifyToken(token); // { uid, jti, iat, exp, ... }
-    const uid = payload?.uid;
+    const uid = String(payload?.uid ?? payload?.sub ?? payload?.userId ?? '');
 
-    if (!uid) {
-      return res.status(401).json({ success:false, code:'BAD_TOKEN', message:'invalid payload' });
+    if (!uid || !uuidValidate(uid)) {
+      return res.status(401).json({ success:false, code:'BAD_TOKEN', message:'invalid payload or uid format' });
     }
 
     // 3) 통과 → req.user에 식별자 저장
-    (req as any).user = { id: uid };
+    req.user = { id: uid };
     next();
   } catch (e: any) {
     return res.status(401).json({ success:false, code:'BAD_TOKEN', message: e?.message || 'invalid token' });

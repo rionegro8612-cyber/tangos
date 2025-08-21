@@ -4,6 +4,8 @@ import db from './db';
 import auth from './auth.mvp';
 import kyc from './kyc.mvp';
 import user from './user';      // ✅ 꼭 필요
+import authMe from './auth.me'; // /api/v1/auth/me
+import profile from './profile'; // /api/v1/profile/...
 
 const router = Router();
 
@@ -11,6 +13,8 @@ const router = Router();
 router.use('/db', db);          // /api/v1/db/ping
 router.use(auth);               // /api/v1/auth/...
 router.use('/auth', kyc);                // /api/v1/auth/kyc/pass
+router.use('/auth', authMe);    // /api/v1/auth/me
 router.use(user);               // ✅ /api/v1/me
+router.use('/profile', profile); // /api/v1/profile/...
 
 export default router;

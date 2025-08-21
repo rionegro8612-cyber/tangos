@@ -27,8 +27,8 @@ router.post("/api/v1/auth/kyc/pass", authRequired, async (req: Request, res: Res
         return res.fail(status, code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH");
       }
 
-      const userId = (req as any).user?.uid;
-      await updateKycStatus(Number(userId), result.provider);
+      const userId = String(req.user?.id);
+      await updateKycStatus(userId, result.provider);
 
       return res.ok({
         verified: true,

@@ -18,6 +18,27 @@ function normalizeQ(q: string) {
   return q.trim().replace(/\s+/g, " "); 
 }
 
+function norm(
+  label?: string,
+  lat?: number | null,
+  lng?: number | null,
+  code?: string | null,
+  source: "kakao"|"vworld"|"local" = "local"
+): LocItem | null {
+  const L = (label || "").trim();
+  if (!L) return null;
+
+  // 선택 속성은 '정의된 경우'에만 포함해서 null을 제거
+  const out: LocItem = {
+    label: L,
+    source,
+    ...(lat  != null ? { lat:  Number(lat) } : {}),
+    ...(lng  != null ? { lng:  Number(lng) } : {}),
+    ...(code != null && code !== "" ? { code: String(code) } : {}),
+  };
+  return out;
+}
+
 export async function searchLocation(qRaw: string): Promise<LocItem[]> {
   const q = normalizeQ(qRaw);
   if (!q) return [];
@@ -39,7 +60,8 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
           const label = d.place_name || d.address_name || d.road_address_name;
           const lat = d.y ? Number(d.y) : (d.latitude ? Number(d.latitude) : undefined);
           const lng = d.x ? Number(d.x) : (d.longitude ? Number(d.longitude) : undefined);
-          if (label) results.push({ label, lat, lng, source: "kakao" });
+          const item = norm(label, lat, lng, /*code*/ null, "kakao");
+          if (item) results.push(item);
         }
       }
     } catch (e) {
@@ -67,7 +89,8 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
           const label = it.title || it.address?.road || it.address?.parcel;
           const lat = it.point?.y ? Number(it.point.y) : undefined;
           const lng = it.point?.x ? Number(it.point.x) : undefined;
-          if (label) results.push({ label, lat, lng, source: "vworld" });
+          const vitem = norm(label, lat, lng, /*code*/ null, "vworld");
+          if (vitem) results.push(vitem);
         }
       }
     } catch (e) {
@@ -86,13 +109,8 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
       ).slice(0, 10);
       
       for (const f of filtered) {
-        results.push({ 
-          label: f.label, 
-          lat: f.lat, 
-          lng: f.lng, 
-          source: "local", 
-          ...(f.code ? { code: f.code } : {}) 
-        });
+        const lit = norm(f.label, f.lat ?? null, f.lng ?? null, f.code ?? null, "local");
+        if (lit) results.push(lit);
       }
     } catch (e) {
       console.warn("[location] 로컬 JSON 읽기 오류:", e);

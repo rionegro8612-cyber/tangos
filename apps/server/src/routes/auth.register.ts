@@ -82,7 +82,7 @@ registerRouter.post("/register/submit", async (req, res) => {
     return res.fail(status, code, code === "KYC_MISMATCH" ? "본인정보 불일치" : "외부 연동 장애");
   }
 
-  const userId = await createUserWithKyc({
+  const userId: string = await createUserWithKyc({
     phone, name, birth, gender: gender ?? null, carrier: session.carrier,
     consent: { 
       tos: hasTos, 

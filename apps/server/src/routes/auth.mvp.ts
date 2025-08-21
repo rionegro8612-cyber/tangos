@@ -8,6 +8,8 @@ import {
   touchLastLogin,
 } from "../repos/userRepo";
 import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
+import { canSend } from "../services/otp";
+import { validate as uuidValidate } from "uuid";
 
 export const authRouter = Router();
 
@@ -44,6 +46,17 @@ authRouter.post(
           success: false,
           code: "BAD_REQUEST",
           message: "phone required",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+      if (!(await canSend(phone, ip))) {
+        return res.status(429).json({
+          success: false,
+          code: "OTP_RATE_LIMIT",
+          message: "Rate limit exceeded",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
@@ -109,6 +122,18 @@ authRouter.post(
       }
 
       const userId = await findOrCreateUserByPhoneE164(r.phoneE164!);
+      
+      // UUID 검증 (findOrCreateUserByPhoneE164에서 반환된 값 검증)
+      if (!userId || !uuidValidate(userId)) {
+        return res.status(500).json({
+          success: false,
+          code: "INTERNAL_ERROR",
+          message: "사용자 ID 생성 실패",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+      
       await touchLastLogin(userId);
 
       // Access 토큰 발급
@@ -160,8 +185,10 @@ authRouter.get(
       }
 
       const decoded: any = verifyAccessToken(token);
-      const userId = Number(decoded?.uid);
-      if (!userId) {
+      const userId = String(decoded?.uid);
+      
+      // UUID 형식 검증 (uuidValidate 사용)
+      if (!userId || !uuidValidate(userId)) {
         return res.status(401).json({
           success: false,
           code: "UNAUTHORIZED",

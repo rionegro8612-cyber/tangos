@@ -9,6 +9,7 @@ import { router } from "./apiRouter";
 import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
 import { setupCleanupScheduler } from "./lib/cleanup";
+import { ensureRedis } from "./lib/redis";
 
 const app = express();
 app.disable("x-powered-by");
@@ -95,8 +96,12 @@ if (process.env.NODE_ENV !== "production") {
 
 const port = Number(process.env.PORT) || 4100;
 console.log(`[env] PORT=${process.env.PORT ?? "(undefined)"} → use ${port}`);
-app.listen(port, () => {
-  console.log(`[server] listening on http://localhost:${port}`);
-  console.log("=== SERVER STARTED ===", new Date().toISOString());
-  setupCleanupScheduler();
-});
+
+(async () => {
+  await ensureRedis();
+  app.listen(port, () => {
+    console.log(`[server] listening on http://localhost:${port}`);
+    console.log("=== SERVER STARTED ===", new Date().toISOString());
+    setupCleanupScheduler();
+  });
+})();

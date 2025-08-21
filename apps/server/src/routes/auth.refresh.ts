@@ -14,24 +14,24 @@ refreshRouter.post("/refresh", async (req, res) => {
     const record = await findByJti(payload.jti);
 
     if (!record || record.revoked) {
-      await revokeAllForUser(Number(payload.uid));
+      await revokeAllForUser(String(payload.uid));
       clearAuthCookies(res);
       return res.fail(401, "AUTH_RT_REUSE", "세션 재인증이 필요합니다.");
     }
     if (record.token_hash !== sha256(rt)) {
-      await revokeAllForUser(Number(payload.uid));
+      await revokeAllForUser(String(payload.uid));
       clearAuthCookies(res);
       return res.fail(401, "AUTH_RT_TAMPERED", "세션 재인증이 필요합니다.");
     }
 
     const newId = newJti();
-    const at = signAccessToken(Number(payload.uid), newId);
-    const newRt = signRefreshToken(Number(payload.uid), newId);
+    const at = signAccessToken(String(payload.uid), newId);
+    const newRt = signRefreshToken(String(payload.uid), newId);
 
     await revokeJti(payload.jti, newId);
     await saveNewRefreshToken({
       jti: newId,
-      userId: Number(payload.uid),
+      userId: String(payload.uid),
       token: newRt,
       expiresAt: new Date(Date.now() + 30*24*60*60*1000),
       userAgent: req.get("user-agent") || undefined, ip: req.ip,

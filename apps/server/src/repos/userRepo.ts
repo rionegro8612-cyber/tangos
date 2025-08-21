@@ -6,15 +6,17 @@ import { query } from "../db";
  *     CREATE UNIQUE INDEX IF NOT EXISTS ux_users_phone ON users(phone_e164_norm);
  */
 export async function findOrCreateUserByPhoneE164(phoneE164: string) {
-  const rows = await query<{ id: number }>(
+  const ENC_KEY = process.env.PHONE_ENC_KEY!;
+  const rows = await query<{ id: string }>(
     `
-    INSERT INTO users (phone_e164_norm, created_at)
-    VALUES ($1, NOW())
-    ON CONFLICT (phone_e164_norm)
-    DO UPDATE SET phone_e164_norm = EXCLUDED.phone_e164_norm
+    INSERT INTO users (phone_e164_norm, phone_enc, created_at, updated_at)
+    VALUES ($1, pgp_sym_encrypt($1, $2), NOW(), NOW())
+    ON CONFLICT (phone_e164_norm) DO UPDATE
+    SET phone_enc = COALESCE(users.phone_enc, pgp_sym_encrypt(EXCLUDED.phone_e164_norm, $2)),
+        updated_at = NOW()
     RETURNING id
     `,
-    [phoneE164]
+    [phoneE164, ENC_KEY]
   );
   // 대부분 1행이 반환됩니다. (충돌 시에도 RETURNING id 보장)
   return rows[0].id;
@@ -24,9 +26,9 @@ export async function findOrCreateUserByPhoneE164(phoneE164: string) {
  * ✅ 프로필을 프런트 친화적 camelCase로 alias
  * 실제 users 테이블 스키마에 맞춤
  */
-export async function getUserProfile(userId: number) {
+export async function getUserProfile(userId: string) {
   const rows = await query<{
-    id: number;
+    id: string;
     phone: string;
     nickname: string | null;
     isVerified: boolean;
@@ -52,7 +54,7 @@ export async function getUserProfile(userId: number) {
       created_at            AS "createdAt",
       updated_at            AS "updatedAt"
     FROM users
-    WHERE id = $1
+    WHERE id = $1::uuid
     `,
     [userId]
   );
@@ -60,32 +62,32 @@ export async function getUserProfile(userId: number) {
 }
 
 /** 마지막 로그인 시각만 갱신 */
-export async function touchLastLogin(userId: number) {
-  await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [userId]);
+export async function touchLastLogin(userId: string) {
+  await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1::uuid`, [userId]);
 }
 
 /** 닉네임 업데이트 (존재 보장 위해 RETURNING) */
-export async function updateUserNickname(userId: number, nickname: string | null) {
-  const rows = await query<{ id: number }>(
-    `UPDATE users SET nickname = $2, updated_at = NOW() WHERE id = $1 RETURNING id`,
+export async function updateUserNickname(userId: string, nickname: string | null) {
+  const rows = await query<{ id: string }>(
+    `UPDATE users SET nickname = $2, updated_at = NOW() WHERE id = $1::uuid RETURNING id`,
     [userId, nickname]
   );
   return rows.length > 0;
 }
 
-export async function updateKycStatus(userId: number, provider: string) {
+export async function updateKycStatus(userId: string, provider: string) {
   await query(
     `UPDATE users
        SET kyc_verified = TRUE,
            kyc_provider = $1,
            kyc_checked_at = NOW()
-     WHERE id = $2`,
+     WHERE id = $2::uuid`,
     [provider, userId]
   );
 }
 
 export async function findByPhone(phone: string) {
-  const rows = await query<{ id: number }>(
+  const rows = await query<{ id: string }>(
     `SELECT id FROM users WHERE phone_e164_norm = $1`,
     [phone]
   );

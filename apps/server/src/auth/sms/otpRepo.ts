@@ -3,7 +3,7 @@ import { e164, hashCode, newSalt } from "./otpUtil";
 import { randomInt } from "crypto";
 
 type CodeRow = {
-  id: number;
+  id: string;
   request_id: string;
   phone_e164_norm: string;
   code_hash: string;          // "hash:salt"
@@ -54,7 +54,7 @@ export async function issueCode(rawPhone: string, opts?: { forceDev?: boolean })
   const hash = hashCode(code, salt);
   const ttlSec = Number(process.env.OTP_CODE_TTL_SEC ?? 180);
 
-  const rows = await query<{ id: number; request_id: string; expire_at: string }>(
+  const rows = await query<{ id: string; request_id: string; expire_at: string }>(
     `INSERT INTO auth_sms_codes (request_id, phone_e164_norm, code_hash, expire_at)
      VALUES (gen_random_uuid(), $1, $2, NOW() + ($3 || ' seconds')::interval)
      RETURNING id, request_id, expire_at`,
