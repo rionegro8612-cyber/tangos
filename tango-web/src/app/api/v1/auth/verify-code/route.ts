@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { signJwt } from "@/src/server/auth";
+import { signJwt } from "@/server/auth";
 
 export async function POST(req: Request) {
   // 공통 응답 유틸

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { readToken } from "@/src/server/auth/cookies";
-import { verifyAccess } from "@/src/server/auth/jwt";
+import { readToken } from "@/server/auth/cookies";
+import { verifyAccess } from "@/server/auth/jwt";
 
 export async function GET() {
   try {

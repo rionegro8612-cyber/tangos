@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuthStore } from '@/src/store/auth';
+import { useAuthStore } from '@/store/auth';
 
 type AnyJson = Record<string, any> | null;
 

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import AuthBootstrap from '@/src/components/AuthBootstrap';
+import AuthBootstrap from '@/components/AuthBootstrap';
 
 export const metadata: Metadata = {
   title: 'Tango',

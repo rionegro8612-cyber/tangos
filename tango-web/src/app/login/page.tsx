@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { sendSms, verifyCode, me } from "@/src/lib/api";
-import { useAuthStore } from "@/src/store/auth";
+import { sendSms, verifyCode, me } from "@/lib/api";
+import { useAuthStore } from "@/store/auth";
 
 // 🆕 새로운 API 함수 사용 옵션 (선택사항)
 // import { api, StandardResponse } from "@/lib/api";

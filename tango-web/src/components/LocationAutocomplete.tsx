@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { api } from "@/src/lib/api";
+import { api } from "../lib/api";
 
 interface LocationItem {
   label: string;

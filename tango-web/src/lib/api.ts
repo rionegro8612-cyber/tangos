@@ -7,13 +7,23 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:41
 const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
 
 // 새로운 StandardResponse 타입 (기존과 통합)
-export type StandardResponse<T> = {
+export type StandardResponse<T = unknown> = {
   success: boolean;
-  code: string;
+  code: string;        // "OK" | "INVALID_..." | "RATE_LIMITED" 등
   message: string;
-  data: T;
-  requestId: string;
+  data?: T;            // 선택적 필드로 변경 (기존 호환성)
+  requestId?: string;  // 선택적 필드로 변경 (기존 호환성)
 };
+
+// 새로운 ApiError 클래스
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    public status: number,
+    public requestId?: string,
+    message?: string
+  ) { super(message || code); }
+}
 
 // 기존 StandardResponse 타입 (하위 호환성 유지)
 type StandardResponseLegacy<T = unknown> = {
@@ -49,6 +59,25 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<Stan
     const err = new Error(m);
     (err as any).code = body?.code ?? `HTTP_${res.status}`;
     throw err;
+  }
+  return body;
+}
+
+// 새로운 apiFetch 함수 (기존과 병행)
+export async function apiFetchNew<T>(input: RequestInfo, init?: RequestInit): Promise<StandardResponse<T>> {
+  const res = await fetch(input, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers || {})
+    },
+    credentials: 'include', // 쿠키 기반 세션/토큰 사용시
+  });
+
+  const body = (await res.json()) as StandardResponse<T>;
+
+  if (!res.ok || body.success === false) {
+    throw new ApiError(body.code || String(res.status), res.status, body.requestId, body.message);
   }
   return body;
 }
