@@ -147,8 +147,10 @@ export default function OnboardingPage() {
           <LocationAutocompleteV2
             value={location || undefined}
             onSelect={(selectedLocation) => {
-              setLocation(selectedLocation);
-              setMessage(`${selectedLocation.name} 지역이 선택되었습니다.`);
+              if (selectedLocation) {
+                setLocation(selectedLocation);
+                setMessage(`${selectedLocation.name} 지역이 선택되었습니다.`);
+              }
             }}
             label="활동 지역"
             placeholder="동/지하철역/장소를 검색하세요"
