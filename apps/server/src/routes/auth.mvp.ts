@@ -8,7 +8,7 @@ import {
   touchLastLogin,
 } from "../repos/userRepo";
 import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
-import { issueOtpCode, verifyOtpCode } from "../services/otp.redis";
+import { checkRate, setOtp, getOtp, delOtp, readIntFromEnv } from "../services/otp.redis";
 import { validate as uuidValidate } from "uuid";
 
 export const authRouter = Router();
@@ -79,19 +79,30 @@ authRouter.post(
       }
 
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-      
-      // Redis 기반 OTP 발급 (레이트리밋 체크 포함)
-      const r = await issueOtpCode(phone, ip);
-      
-      if (!r.success) {
+
+      // 환경변수에서 설정값 가져오기
+      const PHONE_LIMIT = readIntFromEnv("OTP_RATE_PER_PHONE", 5);
+      const PHONE_WIN   = readIntFromEnv("OTP_RATE_PHONE_WINDOW", 600);
+      const IP_LIMIT    = readIntFromEnv("OTP_RATE_PER_IP", 20);
+      const IP_WIN      = readIntFromEnv("OTP_RATE_IP_WINDOW", 3600);
+      const TTL         = readIntFromEnv("OTP_TTL_SEC", 300);
+
+      // 레이트리밋 체크
+      const okPhone = await checkRate(`rl:phone:${phone}`, PHONE_LIMIT, PHONE_WIN);
+      const okIp    = await checkRate(`rl:ip:${ip}`,     IP_LIMIT,   IP_WIN);
+      if (!okPhone || !okIp) {
         return res.status(429).json({
           success: false,
           code: "OTP_RATE_LIMIT",
-          message: r.message,
-          data: { retryAfterSec: r.retryAfterSec ?? 60 },
+          message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+          data: { retryAfterSec: 60 },
           requestId: (req as any).requestId ?? null,
         });
       }
+
+      // OTP 코드 생성 및 저장
+      const code = ("" + Math.floor(100000 + Math.random() * 900000));
+      await setOtp(phone, code, TTL);
 
       // 개발 환경에서만 코드 표시
       const isDev = process.env.NODE_ENV !== "production";
@@ -99,12 +110,12 @@ authRouter.post(
 
       const data: any = { 
         phoneE164: phone, 
-        expiresInSec: r.ttlSec,
-        ...(includeDevCode && r.code ? { devCode: r.code } : {})
+        expiresInSec: TTL,
+        ...(includeDevCode ? { devCode: code } : {})
       };
       
-      if (includeDevCode && r.code) {
-        console.log(`[DEV][OTP] ${phone} -> ${r.code}`);
+      if (includeDevCode) {
+        console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s)`);
       }
       
       return res.ok(data, "OTP_SENT");
@@ -130,18 +141,31 @@ authRouter.post(
         });
       }
 
-      const r = await verifyOtpCode(phone, code);
-      if (!r.success) {
+      const saved = await getOtp(phone);
+      if (!saved) {
         return res.status(400).json({
           success: false,
-          code: "OTP_INVALID",
-          message: r.message,
+          code: "OTP_EXPIRED",
+          message: "코드가 만료되었거나 존재하지 않습니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+      
+      if (saved !== String(code)) {
+        return res.status(400).json({
+          success: false,
+          code: "OTP_MISMATCH",
+          message: "코드가 올바르지 않습니다.",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
       }
 
-      const userId = await findOrCreateUserByPhoneE164(r.phoneE164!);
+      // OTP 코드 삭제 (재사용 방지)
+      await delOtp(phone);
+
+      const userId = await findOrCreateUserByPhoneE164(phone);
       
       // UUID 검증 (findOrCreateUserByPhoneE164에서 반환된 값 검증)
       if (!userId || !uuidValidate(userId)) {
