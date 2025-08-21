@@ -37,3 +37,6 @@ tango-web/.env.local
 **/.DS_Store
 pgdata/
 dist/
+
+# server env
+/apps/server/.env

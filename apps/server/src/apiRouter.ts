@@ -8,7 +8,7 @@ import { kycRouter } from "./routes/kyc";
 
 // 새로 추가한 라우터
 import { registerRouter } from "./routes/auth.register";
-import { profileRouter } from "./routes/profile";
+import profileRouter from "./routes/profile";
 import { locationRouter } from "./routes/location";
 
 export const router = Router();

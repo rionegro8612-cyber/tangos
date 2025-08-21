@@ -23,22 +23,51 @@ app.use(cookieParser());
 const TRUST_PROXY = process.env.TRUST_PROXY ?? "1";
 app.set("trust proxy", TRUST_PROXY === "1" ? 1 : TRUST_PROXY);
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(morgan("dev"));
+// 프로덕션 모드에서 보안 헤더 강화
+app.use(helmet({
+  crossOriginEmbedderPolicy: true,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "same-origin" },
+  contentSecurityPolicy: false, // 기존 설정 유지
+}));
 
-const envAllow = (process.env.FRONT_ORIGINS || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
-const defaultDevAllows = ["http://localhost:3000", "http://127.0.0.1:3000"];
-const allowList = new Set(envAllow.length ? envAllow : defaultDevAllows);
+// 로깅 설정 (프로덕션에서는 간소화)
+if (process.env.NODE_ENV === "production") {
+  app.use(morgan("combined"));
+} else {
+  app.use(morgan("dev"));
+}
+
+// CORS 설정 (프로덕션 모드에 맞게)
+const corsOrigin = process.env.CORS_ORIGIN;
+const frontOrigins = process.env.FRONT_ORIGINS;
+
+let allowList: Set<string>;
+if (process.env.NODE_ENV === "production") {
+  // 프로덕션: CORS_ORIGIN 우선, 없으면 FRONT_ORIGINS
+  const origins = corsOrigin || frontOrigins || "";
+  allowList = new Set(origins.split(",").map(s => s.trim()).filter(Boolean));
+} else {
+  // 개발: 기본 허용 + 환경변수
+  const envAllow = (frontOrigins || "").split(",").map(s => s.trim()).filter(Boolean);
+  const defaultDevAllows = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  allowList = new Set(envAllow.length ? envAllow : defaultDevAllows);
+}
 
 const corsDelegate: CorsOptionsDelegate = (req, cb) => {
   const origin = (req.headers.origin as string) || "";
+  
+  // 프로덕션에서는 origin이 반드시 있어야 함
+  if (process.env.NODE_ENV === "production" && !origin) {
+    return cb(new Error("CORS: Origin required in production"));
+  }
+  
   const ok = !origin || allowList.has(origin);
   cb(null, {
     origin: ok,
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 };
 app.use(cors(corsDelegate));

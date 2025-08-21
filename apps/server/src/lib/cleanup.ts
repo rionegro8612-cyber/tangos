@@ -30,18 +30,16 @@ export async function cleanupExpiredRefreshTokens() {
 export async function cleanupRedisExpiredKeys() {
   try {
     // Redis에서 만료된 키들 정리 (Redis는 자동으로 만료된 키를 제거하지만, 명시적으로 정리)
-    await redis.eval(`
-      local keys = redis.call('keys', 'rl:otp:*')
-      local count = 0
-      for i, key in ipairs(keys) do
-        if redis.call('ttl', key) == -1 then
-          redis.call('del', key)
-          count = count + 1
-        end
-      end
-      return count
-    `, 0);
-    console.log('[cleanup] Redis 만료된 키 정리 완료');
+    const keys = await redis.keys('rl:otp:*');
+    let count = 0;
+    for (const key of keys) {
+      const ttl = await redis.ttl(key);
+      if (ttl === -1) {
+        await redis.del(key);
+        count++;
+      }
+    }
+    console.log(`[cleanup] Redis 만료된 키 ${count}개 정리`);
   } catch (error) {
     console.error('[cleanup] Redis 정리 실패:', error);
   }

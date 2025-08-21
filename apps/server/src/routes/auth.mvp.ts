@@ -8,7 +8,7 @@ import {
   touchLastLogin,
 } from "../repos/userRepo";
 import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
-import { canSend } from "../services/otp";
+import { issueOtpCode, verifyOtpCode } from "../services/otp.redis";
 import { validate as uuidValidate } from "uuid";
 
 export const authRouter = Router();
@@ -20,16 +20,43 @@ function getTokenFromReq(req: Request) {
   return m?.[1] || (req.cookies?.access_token as string | undefined);
 }
 
-/** Access-Token 쿠키 옵션(간단 버전) */
+/** Access-Token 쿠키 옵션(프로덕션 모드 강화) */
 function accessCookieOptions() {
-  const secure = String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true";
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  // 보안 설정 (프로덕션에서는 강화)
+  const secure = String(process.env.COOKIE_SECURE || (isProduction ? "true" : "false")).toLowerCase() === "true";
   const domain = process.env.COOKIE_DOMAIN || undefined;
   const maxMin = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30);
+  
+  // SameSite 설정 (프로덕션에서는 환경변수 우선)
+  let sameSite: "lax" | "none" | "strict";
+  if (process.env.COOKIE_SAMESITE) {
+    const envSameSite = process.env.COOKIE_SAMESITE.toLowerCase();
+    if (envSameSite === "lax" || envSameSite === "none" || envSameSite === "strict") {
+      sameSite = envSameSite;
+    } else {
+      sameSite = "lax";
+    }
+  } else if (secure) {
+    // HTTPS에서는 none (크로스사이트 지원)
+    sameSite = "none";
+  } else {
+    // HTTP에서는 lax (보안과 호환성 균형)
+    sameSite = "lax";
+  }
+  
+  // 프로덕션에서 SameSite=none일 때 secure=true 필수
+  if (sameSite === "none" && !secure) {
+    console.warn("[COOKIE] SameSite=none requires secure=true in production");
+    sameSite = "lax"; // 자동으로 lax로 변경
+  }
+  
   return {
     httpOnly: true,
-    secure,                         // 로컬 HTTP면 false, HTTPS 배포면 true
-    sameSite: secure ? "none" as const : "lax" as const,
-    domain,                         // 필요 없으면 undefined 유지
+    secure,
+    sameSite,
+    domain,
     path: "/",
     maxAge: maxMin * 60 * 1000,
   };
@@ -52,41 +79,34 @@ authRouter.post(
       }
 
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-      if (!(await canSend(phone, ip))) {
+      
+      // Redis 기반 OTP 발급 (레이트리밋 체크 포함)
+      const r = await issueOtpCode(phone, ip);
+      
+      if (!r.success) {
         return res.status(429).json({
           success: false,
           code: "OTP_RATE_LIMIT",
-          message: "Rate limit exceeded",
-          data: null,
-          requestId: (req as any).requestId ?? null,
-        });
-      }
-
-      const forceDev = String(req.query.dev ?? "").trim() === "1";
-      const r = await issueCode(phone, { forceDev });
-
-      if (!r.ok) {
-        return res.status(429).json({
-          success: false,
-          code: r.code,
           message: r.message,
-          data: { retryAfterSec: (r as any).retryAfterSec ?? 60 },
+          data: { retryAfterSec: r.retryAfterSec ?? 60 },
           requestId: (req as any).requestId ?? null,
         });
       }
 
-      const providerIsMock =
-        String(process.env.SMS_PROVIDER || "").trim().toLowerCase() === "mock";
-      const debugOtpOn = ["1", "true", "yes", "on"].includes(
-        String(process.env.DEBUG_OTP ?? "").trim().toLowerCase()
-      );
-      const includeDev = forceDev || providerIsMock || debugOtpOn;
+      // 개발 환경에서만 코드 표시
+      const isDev = process.env.NODE_ENV !== "production";
+      const includeDevCode = isDev || String(req.query.dev ?? "").trim() === "1";
 
-      const data: any = { phoneE164: r.phoneE164, expiresInSec: r.expiresInSec };
-      if (includeDev && (r as any)._codeForDev) {
-        data.devCode = (r as any)._codeForDev;
-        console.log(`[DEV][OTP] ${r.phoneE164} -> ${(r as any)._codeForDev}`);
+      const data: any = { 
+        phoneE164: phone, 
+        expiresInSec: r.ttlSec,
+        ...(includeDevCode && r.code ? { devCode: r.code } : {})
+      };
+      
+      if (includeDevCode && r.code) {
+        console.log(`[DEV][OTP] ${phone} -> ${r.code}`);
       }
+      
       return res.ok(data, "OTP_SENT");
     } catch (e) {
       next(e);
@@ -110,11 +130,11 @@ authRouter.post(
         });
       }
 
-      const r = await verifyCode(phone, code);
-      if (!r.ok) {
+      const r = await verifyOtpCode(phone, code);
+      if (!r.success) {
         return res.status(400).json({
           success: false,
-          code: r.code,
+          code: "OTP_INVALID",
           message: r.message,
           data: null,
           requestId: (req as any).requestId ?? null,
