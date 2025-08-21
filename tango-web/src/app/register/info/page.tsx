@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
 
 export default function RegisterInfoPage(){
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -47,7 +47,7 @@ export default function RegisterInfoPage(){
     }
 
     try {
-      const r = await fetch(`${BASE}/api/v1/auth/register/submit`, {
+      const r = await fetch(`${BASE}/auth/register/submit`, {
         method:"POST", credentials:"include",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({

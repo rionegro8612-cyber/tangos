@@ -8,8 +8,9 @@ import {
   touchLastLogin,
 } from "../repos/userRepo";
 import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
-import { checkRate, setOtp, getOtp, delOtp, readIntFromEnv } from "../services/otp.redis";
+import { checkRate, setOtp, getOtp, delOtp, readIntFromEnv, getRateLimitInfo } from "../services/otp.redis";
 import { validate as uuidValidate } from "uuid";
+import { logOtpSend, logOtpVerify } from "../lib/logger";
 
 export const authRouter = Router();
 
@@ -87,15 +88,67 @@ authRouter.post(
       const IP_WIN      = readIntFromEnv("OTP_RATE_IP_WINDOW", 3600);
       const TTL         = readIntFromEnv("OTP_TTL_SEC", 300);
 
-      // 레이트리밋 체크
-      const okPhone = await checkRate(`rl:phone:${phone}`, PHONE_LIMIT, PHONE_WIN);
-      const okIp    = await checkRate(`rl:ip:${ip}`,     IP_LIMIT,   IP_WIN);
+      const startTime = Date.now();
+      
+      // 레이트리밋 체크 및 상세 정보 수집
+      const phoneKey = `rl:phone:${phone}`;
+      const ipKey = `rl:ip:${ip}`;
+      
+      const phoneInfo = await getRateLimitInfo(phoneKey, PHONE_LIMIT, PHONE_WIN);
+      const ipInfo = await getRateLimitInfo(ipKey, IP_LIMIT, IP_WIN);
+      
+      const okPhone = !phoneInfo.isExceeded;
+      const okIp = !ipInfo.isExceeded;
+      
       if (!okPhone || !okIp) {
+        // 레이트리밋 정보 결정
+        const scope = !okPhone && !okIp ? 'combo' : !okPhone ? 'phone' : 'ip';
+        const retryAfterSec = Math.max(
+          phoneInfo.isExceeded ? phoneInfo.resetSec : 0,
+          ipInfo.isExceeded ? ipInfo.resetSec : 0
+        );
+        
+        // 레이트리밋 헤더 설정
+        res.set({
+          'Retry-After': retryAfterSec.toString(),
+          'X-RateLimit-Limit': Math.max(PHONE_LIMIT, IP_LIMIT).toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': Math.max(
+            phoneInfo.isExceeded ? phoneInfo.resetSec : 0,
+            ipInfo.isExceeded ? ipInfo.resetSec : 0
+          ).toString()
+        });
+        
+        // 구조화 로깅
+        const latencyMs = Date.now() - startTime;
+        logOtpSend(
+          'fail',
+          'RATE_LIMITED',
+          429,
+          req.requestId,
+          phone,
+          ip,
+          'SENS',
+          retryAfterSec,
+          {
+            scope,
+            limit: Math.max(PHONE_LIMIT, IP_LIMIT),
+            remaining: 0,
+            reset_sec: retryAfterSec
+          },
+          latencyMs
+        );
+        
         return res.status(429).json({
           success: false,
-          code: "OTP_RATE_LIMIT",
+          code: "RATE_LIMITED",
           message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
-          data: { retryAfterSec: 60 },
+          data: { 
+            scope,
+            retryAfterSec,
+            phoneLimit: { limit: PHONE_LIMIT, remaining: phoneInfo.remaining, resetSec: phoneInfo.resetSec },
+            ipLimit: { limit: IP_LIMIT, remaining: ipInfo.remaining, resetSec: ipInfo.resetSec }
+          },
           requestId: (req as any).requestId ?? null,
         });
       }
@@ -103,6 +156,16 @@ authRouter.post(
       // OTP 코드 생성 및 저장
       const code = ("" + Math.floor(100000 + Math.random() * 900000));
       await setOtp(phone, code, TTL);
+
+      // 성공 시 레이트리밋 헤더 설정
+      const remainingPhone = Math.max(0, PHONE_LIMIT - phoneInfo.current);
+      const remainingIp = Math.max(0, IP_LIMIT - ipInfo.current);
+      
+      res.set({
+        'X-RateLimit-Limit': Math.max(PHONE_LIMIT, IP_LIMIT).toString(),
+        'X-RateLimit-Remaining': Math.min(remainingPhone, remainingIp).toString(),
+        'X-RateLimit-Reset': Math.max(phoneInfo.resetSec, ipInfo.resetSec).toString()
+      });
 
       // 개발 환경에서만 코드 표시
       const isDev = process.env.NODE_ENV !== "production";
@@ -118,6 +181,26 @@ authRouter.post(
         console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s)`);
       }
       
+              // 성공 로깅
+        const latencyMs = Date.now() - startTime;
+        logOtpSend(
+          'success',
+          'OTP_SENT',
+          200,
+          req.requestId,
+          phone,
+          ip,
+          'SENS',
+          undefined,
+          {
+            scope: 'combo',
+            limit: Math.max(PHONE_LIMIT, IP_LIMIT),
+            remaining: Math.min(remainingPhone, remainingIp),
+            reset_sec: Math.max(phoneInfo.resetSec, ipInfo.resetSec)
+          },
+          latencyMs
+        );
+      
       return res.ok(data, "OTP_SENT");
     } catch (e) {
       next(e);
@@ -130,6 +213,7 @@ authRouter.post(
   "/verify-code",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const startTime = Date.now();
       const { phone, code } = (req.body || {}) as { phone?: string; code?: string };
       if (!phone || !code) {
         return res.status(400).json({
@@ -143,6 +227,21 @@ authRouter.post(
 
       const saved = await getOtp(phone);
       if (!saved) {
+        const latencyMs = Date.now() - startTime;
+        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+        
+        logOtpVerify(
+          'fail',
+          'OTP_EXPIRED',
+          400,
+          req.requestId,
+          phone,
+          ip,
+          undefined,
+          latencyMs,
+          'OTP code expired or not found'
+        );
+        
         return res.status(400).json({
           success: false,
           code: "OTP_EXPIRED",
@@ -153,6 +252,21 @@ authRouter.post(
       }
       
       if (saved !== String(code)) {
+        const latencyMs = Date.now() - startTime;
+        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+        
+        logOtpVerify(
+          'fail',
+          'OTP_MISMATCH',
+          400,
+          req.requestId,
+          phone,
+          ip,
+          undefined,
+          latencyMs,
+          'OTP code mismatch'
+        );
+        
         return res.status(400).json({
           success: false,
           code: "OTP_MISMATCH",
@@ -183,6 +297,21 @@ authRouter.post(
       // Access 토큰 발급
       const jti = newJti();
       const accessToken = signAccessToken(userId, jti);
+
+      // 성공 로깅
+      const latencyMs = Date.now() - startTime;
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+      
+              logOtpVerify(
+          'success',
+          'LOGIN_OK',
+          200,
+          req.requestId,
+          phone,
+          ip,
+          userId,
+          latencyMs
+        );
 
       // 쿠키 사용 여부(AUTH_COOKIE=1) — 기본은 켜져있다고 가정
       if (String(process.env.AUTH_COOKIE || "1") === "1") {

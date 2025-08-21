@@ -36,6 +36,54 @@ export async function checkRate(key: string, limit: number, windowSec: number): 
   return n <= limit;
 }
 
+// 레이트리밋 상세 정보 반환 함수 추가
+export async function getRateLimitInfo(key: string, limit: number, windowSec: number): Promise<{
+  current: number;
+  limit: number;
+  remaining: number;
+  resetSec: number;
+  isExceeded: boolean;
+}> {
+  try {
+    if (redis && (redis as any).isOpen) {
+      const current = await redis.get(key);
+      const n = current ? parseInt(current) : 0;
+      const ttl = await redis.ttl(key);
+      const resetSec = ttl > 0 ? ttl : windowSec;
+      
+      return {
+        current: n,
+        limit,
+        remaining: Math.max(0, limit - n),
+        resetSec,
+        isExceeded: n > limit
+      };
+    }
+  } catch (e) {
+    console.warn("[rate-limit] redis error:", (e as any)?.message);
+  }
+  
+  // memory fallback
+  const item = memRL.get(key);
+  if (!item || item.exp < now()) {
+    return {
+      current: 0,
+      limit,
+      remaining: limit,
+      resetSec: windowSec,
+      isExceeded: false
+    };
+  }
+  
+  return {
+    current: item.n,
+    limit,
+    remaining: Math.max(0, limit - item.n),
+    resetSec: Math.ceil((item.exp - now()) / 1000),
+    isExceeded: item.n > limit
+  };
+}
+
 export async function setOtp(phone: string, code: string, ttlSec: number) {
   try {
     if (redis && (redis as any).isOpen) {
