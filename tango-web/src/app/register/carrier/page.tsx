@@ -5,14 +5,24 @@ import { useEffect, useState } from "react";
 export default function RegisterCarrierPage() {
   const r = useRouter();
   const [carrier, setCarrier] = useState("SKT");
-  const phone = sessionStorage.getItem("phone");
+  const [loading, setLoading] = useState(true);
+  
+  // SSR 회피: 브라우저에서만 sessionStorage 읽기
+  const [phone, setPhone] = useState<string | null>(null);
 
   useEffect(()=>{ 
-    if (!phone) {
-      r.replace("/register/phone");
-      return;
+    try {
+      const p = window.sessionStorage.getItem("phone");
+      setPhone(p);
+      
+      if (!p) {
+        r.replace("/register/phone");
+        return;
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [phone, r]);
+  }, [r]);
 
   function next(e: React.FormEvent) {
     e.preventDefault();
@@ -20,8 +30,19 @@ export default function RegisterCarrierPage() {
       r.replace("/register/phone");
       return;
     }
-    sessionStorage.setItem("carrier", carrier);
-    r.push("/register/info"); // OTP 발송 대신 info 페이지로 이동
+    window.sessionStorage.setItem("carrier", carrier);
+    r.push("/register/info"); // 기본정보 입력 페이지로 이동
+  }
+
+  // 로딩 중이거나 필수 데이터가 없으면 로딩 표시
+  if (loading || !phone) {
+    return (
+      <div className="max-w-md mx-auto p-6 space-y-4">
+        <div className="text-center">
+          <p>불러오는 중...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

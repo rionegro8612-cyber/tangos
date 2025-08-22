@@ -4,12 +4,9 @@ import { useState, useCallback } from 'react';
 export interface SignupDraft {
   phone?: string;
   carrier?: string;
-  phoneVerified?: boolean;
-  code?: string; // OTP 코드
   name?: string;
   birth?: string;
   gender?: "M" | "F" | ""; // 성별
-  kycVerified?: boolean;
   terms?: { // 약관 동의
     tos: boolean;
     privacy: boolean;

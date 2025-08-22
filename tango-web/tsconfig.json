@@ -18,7 +18,19 @@
       },
       "incremental": true,
       "plugins": [{ "name": "next" }],
-      "types": ["node"]
+      "types": ["node"],
+      
+      // 배포 전 코드 품질 향상을 위한 추가 설정
+      "noImplicitAny": true,
+      "noImplicitReturns": true,
+      "noImplicitThis": true,
+      "noUnusedLocals": true,
+      "noUnusedParameters": true,
+      "exactOptionalPropertyTypes": true,
+      "noUncheckedIndexedAccess": true,
+      "noImplicitOverride": true,
+      "allowUnusedLabels": false,
+      "allowUnreachableCode": false
     },
     "include": [
       "next-env.d.ts",

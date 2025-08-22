@@ -15,6 +15,13 @@ type VerifyResp = {
   autoLogin: boolean;
 };
 
+// 에러 타입 정의
+interface ApiError {
+  code?: string;
+  status?: number;
+  message?: string;
+}
+
 interface OtpFormProps {
   phone: string;
   onSuccess?: (result: VerifyResp) => void;
@@ -60,7 +67,7 @@ export default function OtpForm({
         setSent(response.data);
         
         // 재전송 쿨다운 설정 (서버 기준 우선, 없으면 기본값)
-        const cooldownSec = (response.data as any).resendCooldownSec ?? 60;
+        const cooldownSec = (response.data as SendResp).resendCooldownSec ?? 60;
         setResendAt(Date.now() + (cooldownSec * 1000));
         
         setMsg('인증번호를 전송했어요.');
@@ -70,19 +77,21 @@ export default function OtpForm({
       } else {
         setMsg('전송에 실패했어요.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('SMS 전송 오류:', error);
       
+      const apiError = error as ApiError;
+      
       // 에러 코드별 메시지 처리
-      if (error.code === 'OTP_RATE_LIMIT') {
+      if (apiError.code === 'OTP_RATE_LIMIT') {
         setMsg('요청이 많아요. 잠시 후 다시 시도해 주세요.');
         // 레이트리밋 시 쿨다운 설정
         setResendAt(Date.now() + (60 * 1000)); // 1분 후 재시도 가능
-      } else if (error.status === 429) {
+      } else if (apiError.status === 429) {
         setMsg('요청이 많아요. 잠시 후 다시 시도해 주세요.');
         setResendAt(Date.now() + (60 * 1000));
       } else {
-        setMsg(error.message || '전송에 실패했어요.');
+        setMsg(apiError.message || '전송에 실패했어요.');
       }
     } finally {
       setBusy(false);
@@ -105,17 +114,19 @@ export default function OtpForm({
         setMsg('인증에 실패했어요.');
         setAttempts(prev => prev + 1);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('OTP 검증 오류:', error);
       
+      const apiError = error as ApiError;
+      
       // 에러 코드별 메시지 처리
-      if (error.code === 'OTP_EXPIRED') {
+      if (apiError.code === 'OTP_EXPIRED') {
         setMsg('인증번호가 만료되었어요. 재전송해 주세요.');
-      } else if (error.code === 'OTP_LOCKED') {
+      } else if (apiError.code === 'OTP_LOCKED') {
         setMsg('시도 횟수가 초과되었어요. 잠시 후 다시 시도해 주세요.');
         setIsLocked(true);
         setResendAt(Date.now() + (10 * 60 * 1000)); // 10분 후 재시도 가능
-      } else if (error.code === 'OTP_MISMATCH' || error.code === 'OTP_INVALID') {
+      } else if (apiError.code === 'OTP_MISMATCH' || apiError.code === 'OTP_INVALID') {
         setMsg('인증번호가 올바르지 않아요.');
         setAttempts(prev => prev + 1);
         
@@ -125,13 +136,13 @@ export default function OtpForm({
           setMsg('시도 횟수가 초과되었어요. 재전송해 주세요.');
           setResendAt(Date.now() + (5 * 60 * 1000)); // 5분 후 재시도 가능
         }
-      } else if (error.status === 429) {
+      } else if (apiError.status === 429) {
         setMsg('요청이 많아요. 잠시 후 다시 시도해 주세요.');
       } else {
-        setMsg(error.message || '인증에 실패했어요.');
+        setMsg(apiError.message || '인증에 실패했어요.');
       }
       
-      onError?.(error.message || '인증 실패');
+      onError?.(apiError.message || '인증 실패');
     } finally {
       setBusy(false);
     }

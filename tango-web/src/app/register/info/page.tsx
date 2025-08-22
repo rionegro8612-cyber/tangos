@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE!; // 예: http://localhost:4100
 
 export default function RegisterInfoPage(){
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -10,14 +10,27 @@ export default function RegisterInfoPage(){
   const [gender, setGender] = useState<"M"|"F"|"" >("");
   const [terms, setTerms] = useState({ tos:false, privacy:false });
   const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
+  // SSR 회피: 브라우저에서만 sessionStorage 읽기
+  const [phone, setPhone] = useState<string | null>(null);
+  const [carrier, setCarrier] = useState<string | null>(null);
 
   // 전화번호와 통신사 확인
   useEffect(() => {
-    const phone = sessionStorage.getItem("phone");
-    const carrier = sessionStorage.getItem("carrier");
-    
-    if (!phone || !carrier) {
-      location.href = "/register/phone";
+    try {
+      const p = window.sessionStorage.getItem("phone");
+      const c = window.sessionStorage.getItem("carrier");
+      setPhone(p);
+      setCarrier(c);
+      
+      if (!p || !c) {
+        window.location.href = "/register/phone";
+        return;
+      }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -39,32 +52,64 @@ export default function RegisterInfoPage(){
     }
   };
 
-  // 최종 제출
-  const onSubmit = async () => {
-    if (!terms.tos || !terms.privacy) {
+  // 인증번호 발송 및 verify 페이지로 이동
+  const onSendSms = async () => {
+    console.log("[onSendSms] start", { phone, carrier, API_BASE, terms });
+
+    if (!terms.tos || !terms.privacy || !phone || !carrier) {
       setMsg("이용약관과 개인정보 처리방침에 동의해주세요.");
       return;
     }
 
+    if (!API_BASE) {
+      alert("환경변수 NEXT_PUBLIC_API_BASE가 비어 있습니다.");
+      return;
+    }
+
+    setSending(true);
+    setMsg("");
+
     try {
-      const r = await fetch(`${BASE}/auth/register/submit`, {
-        method:"POST", credentials:"include",
-        headers:{ "Content-Type":"application/json" },
+      // 인증번호 발송
+             const response = await fetch(`${API_BASE}/auth/send-sms`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: sessionStorage.getItem("phone"),
-          name, birth, gender,
-          termsAccepted: [{key:"tos",version:"1.0.0"}, {key:"privacy",version:"1.0.0"}]
+          phone,
+          carrier,
+          context: "signup"
         })
       });
-      const j = await r.json();
-      if (j.success) {
-        // OTP 발송을 위해 verify 페이지로 이동
-        location.href="/register/verify";
-      } else {
-        setMsg(j.message || "가입에 실패했습니다.");
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        const errorMsg = `HTTP ${response.status} ${response.statusText} :: ${text}`;
+        console.error("[send-sms failed]", errorMsg);
+        setMsg(errorMsg);
+        return;
       }
-    } catch (error) {
+
+      const data = await response.json();
+      console.log("[send-sms OK]", data);
+      
+      if (data.success) {
+        // 모든 정보를 sessionStorage에 저장
+        window.sessionStorage.setItem("name", name);
+        window.sessionStorage.setItem("birth", birth);
+        window.sessionStorage.setItem("gender", gender);
+        window.sessionStorage.setItem("terms", JSON.stringify(terms));
+        
+        // verify 페이지로 이동
+        window.location.href = "/register/verify";
+      } else {
+        setMsg(data.message || "인증번호 전송에 실패했습니다.");
+      }
+    } catch (e: any) {
+      console.error("[send-sms exception]", e?.message || e);
       setMsg("서버 오류가 발생했습니다.");
+    } finally {
+      setSending(false);
     }
   };
 
@@ -76,6 +121,17 @@ export default function RegisterInfoPage(){
     return false;
   };
 
+  // 로딩 중이거나 필수 데이터가 없으면 로딩 표시
+  if (loading || !phone || !carrier) {
+    return (
+      <main className="mx-auto max-w-[430px] p-6">
+        <div className="text-center">
+          <p>불러오는 중...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-[430px] p-6">
       <h1 className="text-xl font-bold mb-4">기본정보 입력</h1>
@@ -85,6 +141,13 @@ export default function RegisterInfoPage(){
         <div className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
         <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
         <div className={`w-3 h-3 rounded-full ${step >= 3 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+      </div>
+
+      {/* 디버그 정보 표시 */}
+      <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+        <p>전화번호: {phone}</p>
+        <p>통신사: {carrier}</p>
+        <p>API_BASE: {API_BASE}</p>
       </div>
 
       {/* 단계 1: 이름 입력 */}
@@ -195,14 +258,14 @@ export default function RegisterInfoPage(){
         ) : (
           <button 
             className={`flex-1 rounded-xl p-3 transition-colors ${
-              canGoNext() 
+              canGoNext() && !sending
                 ? 'bg-blue-500 text-white hover:bg-blue-600' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
-            onClick={onSubmit}
-            disabled={!canGoNext()}
+            onClick={onSendSms}
+            disabled={!canGoNext() || sending}
           >
-            다음 단계
+            {sending ? "인증번호 전송 중..." : "다음"}
           </button>
         )}
       </div>
