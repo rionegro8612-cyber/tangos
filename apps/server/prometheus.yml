@@ -1,0 +1,69 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# 규칙 파일들
+rule_files:
+  - "prometheus-rules.yml"
+
+# 스크랩 설정
+scrape_configs:
+  # Prometheus 자체 모니터링
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Tango Server 메트릭 수집
+  - job_name: 'tango-server'
+    static_configs:
+      - targets: ['host.docker.internal:4100']  # Docker 컨테이너에서 호스트 접근
+        labels:
+          service: 'tango-server'
+          environment: 'development'
+          version: '1.0.0'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    
+    # HTTP 헤더 설정
+    honor_labels: true
+    honor_timestamps: true
+    
+    # 메트릭 라벨 추가
+    metric_relabel_configs:
+      # 서비스 라벨 추가
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '(.+)'
+        replacement: '${1}'
+      
+      # 환경 라벨 추가
+      - target_label: env
+        replacement: 'development'
+      
+      # 버전 라벨 추가
+      - target_label: version
+        replacement: '1.0.0'
+
+  # Redis 메트릭 수집 (Redis Exporter 사용 시)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis:6379']
+  #   metrics_path: '/metrics'
+
+  # PostgreSQL 메트릭 수집 (Postgres Exporter 사용 시)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres:5432']
+  #   metrics_path: '/metrics'
+
+# 알림 매니저 설정
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 알림 규칙 파일
+rule_files:
+  - "prometheus-rules.yml"

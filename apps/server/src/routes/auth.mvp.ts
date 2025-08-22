@@ -8,9 +8,23 @@ import {
   touchLastLogin,
 } from "../repos/userRepo";
 import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
-import { checkRate, setOtp, getOtp, delOtp, readIntFromEnv, getRateLimitInfo } from "../services/otp.redis";
+import { checkRate, setOtp, getOtp, delOtp, readIntFromEnv, getRateLimitInfo, rlIncr } from "../services/otp.redis";
 import { validate as uuidValidate } from "uuid";
 import { logOtpSend, logOtpVerify } from "../lib/logger";
+import { 
+  recordOtpSend, 
+  recordOtpVerify, 
+  recordRateLimitExceeded,
+  recordUserRegistration,
+  recordUserLogin 
+} from "../lib/metrics"; // 🆕 Added: 메트릭 함수들
+
+// 🆕 환경변수 상수 추가
+const TTL = readIntFromEnv("OTP_TTL", 300); // 5분
+const PHONE_LIMIT = readIntFromEnv("OTP_RATE_PER_PHONE", 5);
+const PHONE_WIN = readIntFromEnv("OTP_RATE_PHONE_WINDOW", 600); // 10분
+const IP_LIMIT = readIntFromEnv("OTP_RATE_PER_IP", 20);
+const IP_WIN = readIntFromEnv("OTP_RATE_IP_WINDOW", 3600); // 1시간
 
 export const authRouter = Router();
 
@@ -68,87 +82,45 @@ authRouter.post(
   "/send-sms",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { phone } = (req.body || {}) as { phone?: string };
-      if (!phone) {
+      const startTime = Date.now();
+      const { phone, carrier, context } = (req.body || {}) as { phone?: string; carrier?: string; context?: string; };
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+
+      if (!phone || !carrier || !context) {
+        // 🆕 메트릭: OTP 전송 실패 (잘못된 요청)
+        recordOtpSend('fail', 'SENS', carrier || 'unknown');
+        
         return res.status(400).json({
           success: false,
           code: "BAD_REQUEST",
-          message: "phone required",
+          message: "phone, carrier, context required",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
       }
 
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-
-      // 환경변수에서 설정값 가져오기
-      const PHONE_LIMIT = readIntFromEnv("OTP_RATE_PER_PHONE", 5);
-      const PHONE_WIN   = readIntFromEnv("OTP_RATE_PHONE_WINDOW", 600);
-      const IP_LIMIT    = readIntFromEnv("OTP_RATE_PER_IP", 20);
-      const IP_WIN      = readIntFromEnv("OTP_RATE_IP_WINDOW", 3600);
-      const TTL         = readIntFromEnv("OTP_TTL_SEC", 300);
-
-      const startTime = Date.now();
-      
-      // 레이트리밋 체크 및 상세 정보 수집
+      // 🚨 레이트리밋 체크 (간단한 형태로 복원)
       const phoneKey = `rl:phone:${phone}`;
       const ipKey = `rl:ip:${ip}`;
       
-      const phoneInfo = await getRateLimitInfo(phoneKey, PHONE_LIMIT, PHONE_WIN);
-      const ipInfo = await getRateLimitInfo(ipKey, IP_LIMIT, IP_WIN);
-      
-      const okPhone = !phoneInfo.isExceeded;
-      const okIp = !ipInfo.isExceeded;
+      // 기본 레이트리밋 체크 (기존 방식)
+      const okPhone = await checkRate(phoneKey, PHONE_LIMIT, PHONE_WIN);
+      const okIp = await checkRate(ipKey, IP_LIMIT, IP_WIN);
       
       if (!okPhone || !okIp) {
-        // 레이트리밋 정보 결정
-        const scope = !okPhone && !okIp ? 'combo' : !okPhone ? 'phone' : 'ip';
-        const retryAfterSec = Math.max(
-          phoneInfo.isExceeded ? phoneInfo.resetSec : 0,
-          ipInfo.isExceeded ? ipInfo.resetSec : 0
-        );
-        
-        // 레이트리밋 헤더 설정
-        res.set({
-          'Retry-After': retryAfterSec.toString(),
-          'X-RateLimit-Limit': Math.max(PHONE_LIMIT, IP_LIMIT).toString(),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': Math.max(
-            phoneInfo.isExceeded ? phoneInfo.resetSec : 0,
-            ipInfo.isExceeded ? ipInfo.resetSec : 0
-          ).toString()
-        });
-        
-        // 구조화 로깅
-        const latencyMs = Date.now() - startTime;
-        logOtpSend(
-          'fail',
-          'RATE_LIMITED',
-          429,
-          req.requestId,
-          phone,
-          ip,
-          'SENS',
-          retryAfterSec,
-          {
-            scope,
-            limit: Math.max(PHONE_LIMIT, IP_LIMIT),
-            remaining: 0,
-            reset_sec: retryAfterSec
-          },
-          latencyMs
-        );
+        // 🆕 메트릭: 레이트리밋 초과
+        if (!okPhone) {
+          recordRateLimitExceeded('phone', 'otp_send');
+        }
+        if (!okIp) {
+          recordRateLimitExceeded('ip', 'otp_send');
+        }
         
         return res.status(429).json({
           success: false,
           code: "RATE_LIMITED",
           message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
-          data: { 
-            scope,
-            retryAfterSec,
-            phoneLimit: { limit: PHONE_LIMIT, remaining: phoneInfo.remaining, resetSec: phoneInfo.resetSec },
-            ipLimit: { limit: IP_LIMIT, remaining: ipInfo.remaining, resetSec: ipInfo.resetSec }
-          },
+          data: null,
           requestId: (req as any).requestId ?? null,
         });
       }
@@ -157,14 +129,11 @@ authRouter.post(
       const code = ("" + Math.floor(100000 + Math.random() * 900000));
       await setOtp(phone, code, TTL);
 
-      // 성공 시 레이트리밋 헤더 설정
-      const remainingPhone = Math.max(0, PHONE_LIMIT - phoneInfo.current);
-      const remainingIp = Math.max(0, IP_LIMIT - ipInfo.current);
-      
+      // 성공 시 레이트리밋 헤더 설정 (간단한 형태)
       res.set({
         'X-RateLimit-Limit': Math.max(PHONE_LIMIT, IP_LIMIT).toString(),
-        'X-RateLimit-Remaining': Math.min(remainingPhone, remainingIp).toString(),
-        'X-RateLimit-Reset': Math.max(phoneInfo.resetSec, ipInfo.resetSec).toString()
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': Math.max(PHONE_WIN, IP_WIN).toString()
       });
 
       // 개발 환경에서만 코드 표시
@@ -180,29 +149,34 @@ authRouter.post(
       if (includeDevCode) {
         console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s)`);
       }
-      
-              // 성공 로깅
-        const latencyMs = Date.now() - startTime;
-        logOtpSend(
-          'success',
-          'OTP_SENT',
-          200,
-          req.requestId,
-          phone,
-          ip,
-          'SENS',
-          undefined,
-          {
-            scope: 'combo',
-            limit: Math.max(PHONE_LIMIT, IP_LIMIT),
-            remaining: Math.min(remainingPhone, remainingIp),
-            reset_sec: Math.max(phoneInfo.resetSec, ipInfo.resetSec)
-          },
-          latencyMs
-        );
+
+      // 🆕 메트릭: OTP 전송 성공
+      recordOtpSend('success', 'SENS', carrier);
+
+      // 성공 로깅
+      const latencyMs = Date.now() - startTime;
+      logOtpSend(
+        'success',
+        'OTP_SENT',
+        200,
+        req.requestId,
+        phone,
+        ip,
+        'SENS',
+        undefined,
+        {
+          scope: 'combo',
+          limit: Math.max(PHONE_LIMIT, IP_LIMIT),
+          remaining: 0,
+          reset_sec: Math.max(PHONE_WIN, IP_WIN)
+        },
+        latencyMs
+      );
       
       return res.ok(data, "OTP_SENT");
     } catch (e) {
+      // 🆕 메트릭: OTP 전송 실패 (시스템 오류)
+      recordOtpSend('fail', 'SENS', 'unknown');
       next(e);
     }
   }
@@ -214,114 +188,76 @@ authRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const startTime = Date.now();
-      const { phone, code } = (req.body || {}) as { phone?: string; code?: string };
-      if (!phone || !code) {
+      const { phone, code, context } = (req.body || {}) as { phone?: string; code?: string; context?: string; };
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
+
+      if (!phone || !code || !context) {
+        // 🆕 메트릭: OTP 검증 실패 (잘못된 요청)
+        recordOtpVerify('fail', 'BAD_REQUEST');
+        
         return res.status(400).json({
           success: false,
           code: "BAD_REQUEST",
-          message: "phone & code required",
+          message: "phone, code, context required",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
       }
 
-      const saved = await getOtp(phone);
-      if (!saved) {
-        const latencyMs = Date.now() - startTime;
-        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-        
-        logOtpVerify(
-          'fail',
-          'OTP_EXPIRED',
-          400,
-          req.requestId,
-          phone,
-          ip,
-          undefined,
-          latencyMs,
-          'OTP code expired or not found'
-        );
-        
-        return res.status(400).json({
-          success: false,
-          code: "OTP_EXPIRED",
-          message: "코드가 만료되었거나 존재하지 않습니다.",
-          data: null,
-          requestId: (req as any).requestId ?? null,
-        });
-      }
+      // OTP 검증
+      const storedCode = await getOtp(phone);
       
-      if (saved !== String(code)) {
-        const latencyMs = Date.now() - startTime;
-        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-        
-        logOtpVerify(
-          'fail',
-          'OTP_MISMATCH',
-          400,
-          req.requestId,
-          phone,
-          ip,
-          undefined,
-          latencyMs,
-          'OTP code mismatch'
-        );
+      if (!storedCode) {
+        // 🆕 메트릭: OTP 검증 실패 (코드 만료)
+        recordOtpVerify('fail', 'EXPIRED');
         
         return res.status(400).json({
           success: false,
-          code: "OTP_MISMATCH",
-          message: "코드가 올바르지 않습니다.",
+          code: "EXPIRED",
+          message: "인증번호가 만료되었습니다.",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
       }
 
-      // OTP 코드 삭제 (재사용 방지)
+      if (storedCode !== code) {
+        // 🆕 메트릭: OTP 검증 실패 (잘못된 코드)
+        recordOtpVerify('fail', 'INVALID_CODE');
+        
+        return res.status(400).json({
+          success: false,
+          code: "INVALID_CODE",
+          message: "잘못된 인증번호입니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      // OTP 사용 후 삭제
       await delOtp(phone);
 
-      const userId = await findOrCreateUserByPhoneE164(phone);
-      
-      // UUID 검증 (findOrCreateUserByPhoneE164에서 반환된 값 검증)
-      if (!userId || !uuidValidate(userId)) {
-        return res.status(500).json({
-          success: false,
-          code: "INTERNAL_ERROR",
-          message: "사용자 ID 생성 실패",
-          data: null,
-          requestId: (req as any).requestId ?? null,
-        });
-      }
-      
-      await touchLastLogin(userId);
-
-      // Access 토큰 발급
-      const jti = newJti();
-      const accessToken = signAccessToken(userId, jti);
+      // 🆕 메트릭: OTP 검증 성공
+      recordOtpVerify('success', 'VALID_CODE');
 
       // 성공 로깅
       const latencyMs = Date.now() - startTime;
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "0.0.0.0";
-      
-              logOtpVerify(
-          'success',
-          'LOGIN_OK',
-          200,
-          req.requestId,
-          phone,
-          ip,
-          userId,
-          latencyMs
-        );
+      logOtpSend(
+        'success',
+        'OTP_VERIFIED',
+        200,
+        req.requestId,
+        phone,
+        ip,
+        'SENS',
+        undefined,
+        undefined,
+        latencyMs
+      );
 
-      // 쿠키 사용 여부(AUTH_COOKIE=1) — 기본은 켜져있다고 가정
-      if (String(process.env.AUTH_COOKIE || "1") === "1") {
-        res.cookie("access_token", accessToken, accessCookieOptions());
-        return res.ok({ userId }, "LOGIN_OK");
-      }
-
-      // 쿠키 비활성화 모드라면 토큰을 바디로 반환
-      return res.ok({ accessToken, userId }, "LOGIN_OK");
+      return res.ok({ verified: true }, "OTP_VERIFIED");
     } catch (e) {
+      // 🆕 메트릭: OTP 검증 실패 (시스템 오류)
+      recordOtpVerify('fail', 'SYSTEM_ERROR');
       next(e);
     }
   }

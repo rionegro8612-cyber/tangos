@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # ===== Grafana Loki (로그 수집기) =====
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: tango-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+  # ===== Grafana Tempo (분산 트레이싱) =====
+  tempo:
+    image: grafana/tempo:2.3.0
+    container_name: tango-tempo
+    ports:
+      - "3200:3200"   # HTTP
+      - "4318:4318"   # OTLP HTTP
+      - "4317:4317"   # OTLP gRPC
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+  # ===== Promtail (로그 수집 에이전트) =====
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: tango-promtail
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yml
+      - /var/log:/var/log
+      - ./logs:/var/log/apps
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - tango-logging
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # ===== Grafana (로그 + 트레이스 시각화) =====
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: tango-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana-tempo-datasource.yaml:/etc/grafana/provisioning/datasources/tempo-datasource.yaml
+    networks:
+      - tango-logging
+    restart: unless-stopped
+    depends_on:
+      - loki
+      - tempo
+
+networks:
+  tango-logging:
+    driver: bridge
+
+volumes:
+  grafana-storage:
+  tempo-data:

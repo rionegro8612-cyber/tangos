@@ -1,0 +1,214 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL'  # 🚨 실제 Slack webhook URL로 교체 필요
+
+# 알림 라우팅 설정
+route:
+  group_by: ['alertname', 'service', 'severity']
+  group_wait: 10s      # 첫 번째 알림 후 10초 대기
+  group_interval: 10s  # 그룹 내 추가 알림은 10초 간격
+  repeat_interval: 1h  # 동일한 알림은 1시간마다 반복
+  receiver: 'slack-notifications'  # 기본 수신자
+  
+  # 심각도별 라우팅
+  routes:
+    # Critical 알림은 PagerDuty로 즉시 전송
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      continue: true  # 다른 수신자에게도 전송
+      
+    # Warning 알림은 Slack으로 전송
+    - match:
+        severity: warning
+      receiver: 'slack-notifications'
+      
+    # Rate limit 관련 알림은 별도 채널로 전송
+    - match:
+        alert_type: rate_limit
+      receiver: 'slack-security'
+      
+    # OTP 품질 문제는 개발팀 채널로 전송
+    - match:
+        alert_type: otp_quality
+      receiver: 'slack-development'
+      
+    # 성능 문제는 운영팀 채널로 전송
+    - match:
+        alert_type: performance
+      receiver: 'slack-operations'
+
+# 수신자 정의
+receivers:
+  # Slack 일반 알림
+  - name: 'slack-notifications'
+    slack_configs:
+      - channel: '#tango-alerts'  # 🚨 실제 Slack 채널명으로 교체 필요
+        title: '🚨 Tango Server 알림'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          *서비스:* {{ .GroupLabels.service }}
+          *심각도:* {{ .GroupLabels.severity }}
+          
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *라벨:*
+          {{ range .Labels.SortedPairs }}
+          • {{ .Name }}: {{ .Value }}
+          {{ end }}
+          
+          *대시보드:* {{ .Annotations.dashboard }}
+          {{ end }}
+        
+        # 알림 색상 설정
+        color: '{{ if eq .GroupLabels.severity "critical" }}danger{{ else if eq .GroupLabels.severity "warning" }}warning{{ else }}good{{ end }}'
+        
+        # 버튼 추가
+        actions:
+          - type: button
+            text: '대시보드 보기'
+            url: '{{ .Annotations.dashboard }}'
+            
+  # Slack 보안 알림 (레이트리밋 등)
+  - name: 'slack-security'
+    slack_configs:
+      - channel: '#tango-security'  # 🚨 실제 보안 채널명으로 교체 필요
+        title: '🛡️ 보안 알림'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          *서비스:* {{ .GroupLabels.service }}
+          *심각도:* {{ .GroupLabels.severity }}
+          
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *라벨:*
+          {{ range .Labels.SortedPairs }}
+          • {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        
+        color: 'warning'
+        
+  # Slack 개발팀 알림 (OTP 품질 등)
+  - name: 'slack-development'
+    slack_configs:
+      - channel: '#tango-development'  # 🚨 실제 개발팀 채널명으로 교체 필요
+        title: '🔧 개발팀 알림'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          *서비스:* {{ .GroupLabels.service }}
+          *심각도:* {{ .GroupLabels.severity }}
+          
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *라벨:*
+          {{ range .Labels.SortedPairs }}
+          • {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        
+        color: 'good'
+        
+  # Slack 운영팀 알림 (성능 등)
+  - name: 'slack-operations'
+    slack_configs:
+      - channel: '#tango-operations'  # 🚨 실제 운영팀 채널명으로 교체 필요
+        title: '⚡ 운영팀 알림'
+        text: |
+          *{{ .GroupLabels.alertname }}*
+          *서비스:* {{ .GroupLabels.service }}
+          *심각도:* {{ .GroupLabels.severity }}
+          
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *라벨:*
+          {{ range .Labels.SortedPairs }}
+          • {{ .Name }}: {{ .Value }}
+          {{ end }}
+          {{ end }}
+        
+        color: '{{ if eq .GroupLabels.severity "critical" }}danger{{ else }}warning{{ end }}'
+        
+  # PagerDuty Critical 알림
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'  # 🚨 실제 PagerDuty service key로 교체 필요
+        description: |
+          Critical Alert: {{ .GroupLabels.alertname }}
+          Service: {{ .GroupLabels.service }}
+          Severity: {{ .GroupLabels.severity }}
+          
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        
+        # PagerDuty 설정
+        client: 'Tango Server Alertmanager'
+        client_url: '{{ .Annotations.dashboard }}'
+        
+        # 알림 그룹화
+        group_by: ['alertname', 'service']
+        
+        # 알림 세부사항
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          status: '{{ .Status }}'
+          severity: '{{ .GroupLabels.severity }}'
+          service: '{{ .GroupLabels.service }}'
+
+# 알림 억제 설정
+inhibit_rules:
+  # Critical 에러율이 높을 때 Warning 에러율 알림 억제
+  - source_match:
+      severity: 'critical'
+      alertname: 'CriticalErrorRate'
+    target_match:
+      severity: 'warning'
+      alertname: 'HighErrorRate'
+    equal: ['service']
+    
+  # 심각한 지연시간 문제가 있을 때 경고 지연시간 알림 억제
+  - source_match:
+      severity: 'critical'
+      alertname: 'CriticalLatencyP99'
+    target_match:
+      severity: 'warning'
+      alertname: 'HighLatencyP95'
+    equal: ['service']
+    
+  # 레이트리밋 과도 사용 시 OTP 품질 문제 알림 억제
+  - source_match:
+      alertname: 'HighRateLimitExceeded'
+    target_match:
+      alert_type: 'otp_quality'
+    equal: ['service']
+
+# 시간 기반 알림 억제 (업무시간 외 알림 제한)
+time_intervals:
+  - name: workdays
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 09:00
+            end_time: 18:00
+            
+  - name: weekends
+    time_intervals:
+      - weekdays: ['saturday', 'sunday']
+        
+  - name: off_hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 18:00
+            end_time: 09:00
+        location: 'Asia/Seoul'  # 🚨 실제 시간대에 맞게 조정 필요

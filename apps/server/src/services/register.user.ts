@@ -1,6 +1,21 @@
 
 import { query } from "../db";
 
+// 🚨 전화번호 E.164 정규화 함수
+function normalizePhoneE164(phone: string): string {
+  const digits = phone.replace(/\D/g, ''); // 숫자만 추출
+  if (digits.startsWith('0')) {
+    return `+82${digits.substring(1)}`; // 0 제거하고 +82 추가
+  }
+  if (digits.startsWith('82')) {
+    return `+${digits}`; // 82로 시작하면 + 추가
+  }
+  if (!digits.startsWith('+82')) {
+    return `+82${digits}`; // +82가 없으면 추가
+  }
+  return phone; // 이미 +82 형식이면 그대로
+}
+
 type CreateUserInput = {
   phone: string;
   name: string;
@@ -13,11 +28,19 @@ type CreateUserInput = {
 
 /** minimal user creation compatible with existing users schema */
 export async function createUserWithKyc(input: CreateUserInput): Promise<string> {
+  // 🚨 전화번호 E.164 정규화 적용
+  const normalizedPhone = normalizePhoneE164(input.phone);
+  console.log('[REGISTER create]', {
+    raw: input.phone,
+    normalized: normalizedPhone,
+    input
+  });
+  
   const rows = await query<{ id: string }>(`
     INSERT INTO users (phone_e164_norm, is_verified, kyc_verified, kyc_provider, kyc_checked_at, birth_date, age, created_at, updated_at)
     VALUES ($1, TRUE, TRUE, $2, NOW(), to_date($3,'YYYYMMDD'), EXTRACT(YEAR FROM AGE(to_date($3,'YYYYMMDD'))), NOW(), NOW())
     RETURNING id
-  `, [input.phone, input.kycProvider, input.birth]);
+  `, [normalizedPhone, input.kycProvider, input.birth]);
   const id = rows[0].id;
 
   // Store consents (simple log table already exists in repo)
@@ -30,6 +53,22 @@ export async function createUserWithKyc(input: CreateUserInput): Promise<string>
 }
 
 export async function findByPhone(phone: string) {
-  const rows = await query<{ id: string }>(`SELECT id FROM users WHERE phone_e164_norm = $1`, [phone]);
-  return rows[0]?.id ?? null;
+  // 🚨 전화번호 E.164 정규화 적용
+  const normalizedPhone = normalizePhoneE164(phone);
+  console.log('[REGISTER check]', {
+    raw: phone,
+    normalized: normalizedPhone,
+    query: `SELECT id FROM users WHERE phone_e164_norm = $1`
+  });
+  
+  const rows = await query<{ id: string }>(`SELECT id FROM users WHERE phone_e164_norm = $1`, [normalizedPhone]);
+  const exists = rows[0]?.id ?? null;
+  
+  console.log('[REGISTER exists check]', {
+    normalizedPhone,
+    exists,
+    foundIds: rows.map(r => r.id)
+  });
+  
+  return exists;
 }

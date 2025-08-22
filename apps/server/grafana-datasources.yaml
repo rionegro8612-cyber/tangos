@@ -1,0 +1,72 @@
+apiVersion: 1
+
+datasources:
+  # Loki (로그 집계)
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      maxDataPoints: 1000
+    editable: true
+
+  # Prometheus (메트릭 수집)
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+      manageAlerts: true
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.47.0"
+      cacheLevel: "High"
+      disableRecordingRules: false
+      incrementalQueryOverlapWindow: "10m"
+    editable: true
+
+  # Grafana Tempo (분산 트레이싱)
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      httpMethod: "GET"
+      serviceMap:
+        datasourceUid: "prometheus"
+      search:
+        hide: false
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: "loki"
+      tracesToLogs:
+        datasourceUid: "loki"
+        tags: ["job", "instance", "pod", "namespace"]
+        mappedTags: [{ key: "service.name", value: "service" }]
+        mapTagNamesEnabled: false
+        spanStartTimeShift: "1h"
+        spanEndTimeShift: "-1h"
+        filterByTraceID: false
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: "prometheus"
+        tags: [{ key: "service.name", value: "service" }, { key: "job" }]
+        queries:
+          - name: "Sample query"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"
+    editable: true
+
+  # Alertmanager (알림 관리) 🆕 추가
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      handleGrafanaAlerts: true
+      implementation: "prometheus"
+      disableResolveMessage: false
+    editable: true

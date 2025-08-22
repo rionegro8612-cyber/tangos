@@ -9,24 +9,39 @@ function parseIntSafe(v: any, d: number) {
   const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
 }
 
-async function rlIncr(key: string, windowSec: number): Promise<number> {
+export async function rlIncr(key: string, windowSec: number): Promise<number> {
   try {
     if (redis && (redis as any).isOpen) {
       const n = await redis.incr(key);
       if (n === 1) await redis.expire(key, windowSec);
+      console.log(`[rate-limit] Redis: ${key} -> ${n}`);
       return n;
     }
   } catch (e) {
     console.warn("[rate-limit] redis error:", (e as any)?.message);
   }
-  // memory fallback
+  
+  // 🚨 메모리 폴백 로직 수정 및 디버깅
   const item = memRL.get(key);
-  const exp  = now() + windowSec * 1000;
-  if (!item || item.exp < now()) {
-    memRL.set(key, { n: 1, exp });
+  const currentTime = now();
+  const exp = currentTime + windowSec * 1000;
+  
+  console.log(`[rate-limit] Memory fallback for ${key}:`, {
+    existing: item ? { n: item.n, exp: item.exp, current: currentTime } : null,
+    windowSec,
+    newExp: exp
+  });
+  
+  if (!item || item.exp < currentTime) {
+    // 새로운 윈도우 시작
+    const newItem = { n: 1, exp };
+    memRL.set(key, newItem);
+    console.log(`[rate-limit] New window: ${key} -> 1 (exp: ${exp})`);
     return 1;
   } else {
+    // 기존 윈도우에서 카운터 증가
     item.n += 1;
+    console.log(`[rate-limit] Increment: ${key} -> ${item.n} (exp: ${item.exp})`);
     return item.n;
   }
 }

@@ -10,9 +10,17 @@ import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
 import { setupCleanupScheduler } from "./lib/cleanup";
 import { ensureRedis } from "./lib/redis";
+import { startTracing, stopTracing, getTracingStatus } from "./lib/tracing"; // 🆕 추가
+import metricsMiddleware from "./middlewares/metrics"; // 🆕 Added: 메트릭 미들웨어
+import errorHandler from "./middlewares/error";
+import apiRouter from "./routes";
+import { getMetrics, getMetricsStatus } from "./lib/metrics"; // 🆕 Added: 메트릭 함수들
 
 const app = express();
 app.disable("x-powered-by");
+
+// 🆕 OpenTelemetry 트레이싱 시작
+startTracing();
 
 // ▼ 필수 파서 (JSON/FORM/쿠키)
 app.use(express.json());
@@ -76,15 +84,82 @@ app.use(cors(corsDelegate));
 app.use(requestId);
 app.use(responseMiddleware);
 
+// 🆕 메트릭 미들웨어 추가 (requestId 이후, 라우터 이전)
+app.use(metricsMiddleware); // 🆕 Added: HTTP 요청 메트릭 수집
+
 // ▼ 헬스체크 (항상 라우터 마운트보다 위에!)
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("OK"));
 app.get("/api/v1/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
+
+// 🆕 메트릭 엔드포인트 추가
+app.get("/metrics", async (_req, res) => {
+  try {
+    const metrics = await getMetrics();
+    res.set('Content-Type', 'text/plain');
+    res.end(metrics);
+  } catch (error) {
+    console.error('[METRICS] Failed to collect metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to collect metrics',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 🆕 메트릭 상태 확인 엔드포인트
+app.get("/api/v1/_metrics", (_req, res) => {
+  res.json({
+    success: true,
+    data: getMetricsStatus(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🆕 트레이싱 상태 확인 엔드포인트
+app.get("/api/v1/_tracing", (_req, res) => {
+  res.json({
+    success: true,
+    data: getTracingStatus(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🆕 통합 상태 확인 엔드포인트
+app.get("/api/v1/_health", (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      tracing: getTracingStatus(),
+      metrics: getMetricsStatus()
+    }
+  });
+});
+
 // ▼ API 라우터 마운트 (가장 중요!)
 const API_BASE = process.env.API_BASE || "/api/v1";
 app.use(API_BASE, router);
 
 // ▼ 에러 핸들러
 app.use(standardErrorHandler);
+app.use(errorHandler);
+
+// 🆕 프로세스 종료 시 트레이싱 정리
+process.on('SIGTERM', () => {
+  console.log('[SERVER] SIGTERM received, shutting down gracefully...');
+  stopTracing();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('[SERVER] SIGINT received, shutting down gracefully...');
+  stopTracing();
+  process.exit(0);
+});
 
 // ▼ 개발 시 등록된 라우트 로그
 if (process.env.NODE_ENV !== "production") {
