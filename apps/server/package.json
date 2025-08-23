@@ -7,6 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "dotenv -e ./.env --overload -- tsx --tsconfig tsconfig.json src/index.ts",
+    "dev:host": "cross-env REDIS_URL=redis://localhost:6379 DATABASE_URL=postgres://postgres:postgres@localhost:5432/tango dotenv -e ./.env -- tsx --tsconfig tsconfig.json src/index.ts",
     "dev:watch": "dotenv -e ./.env --overload -- tsx watch --tsconfig tsconfig.json src/index.ts",
     "build": "dotenv -e ./.env --overload -- tsc",
     "start": "dotenv -e ./.env --overload -- node dist/index.js",
@@ -48,7 +49,8 @@
     "prom-client": "^15.1.3",
     "redis": "^4.7.1",
     "twilio": "^5.8.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
@@ -59,6 +61,7 @@
     "@types/node": "^24.2.1",
     "@types/pg": "^8.15.5",
     "@types/uuid": "^10.0.0",
+    "cross-env": "^7.0.3",
     "dotenv-cli": "^10.0.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.4",

@@ -8,10 +8,10 @@ import { query } from "../db";
 export async function findOrCreateUserByPhoneE164(phoneE164: string) {
   const rows = await query<{ id: string }>(
     `
-    INSERT INTO users (phone_e164_norm, created_at, updated_at)
-    VALUES ($1::text, NOW(), NOW())
+    INSERT INTO users (phone_e164_norm, created_at)
+    VALUES ($1::text, NOW())
     ON CONFLICT (phone_e164_norm) DO UPDATE
-    SET updated_at = NOW()
+    SET created_at = NOW()
     RETURNING id
     `,
     [phoneE164]
@@ -37,7 +37,6 @@ export async function getUserProfile(userId: string) {
     birthDate: string | null;
     age: number | null;
     createdAt: string;
-    updatedAt: string;
   }>(
     `
     SELECT
@@ -50,8 +49,7 @@ export async function getUserProfile(userId: string) {
       kyc_checked_at        AS "kycCheckedAt",
       birth_date            AS "birthDate",
       age                   AS age,
-      created_at            AS "createdAt",
-      updated_at            AS "updatedAt"
+      created_at            AS "createdAt"
     FROM users
     WHERE id = $1::uuid
     `,
@@ -68,7 +66,7 @@ export async function touchLastLogin(userId: string) {
 /** 닉네임 업데이트 (존재 보장 위해 RETURNING) */
 export async function updateUserNickname(userId: string, nickname: string | null) {
   const rows = await query<{ id: string }>(
-    `UPDATE users SET nickname = $2, updated_at = NOW() WHERE id = $1::uuid RETURNING id`,
+    `UPDATE users SET nickname = $2 WHERE id = $1::uuid RETURNING id`,
     [userId, nickname]
   );
   return rows.length > 0;

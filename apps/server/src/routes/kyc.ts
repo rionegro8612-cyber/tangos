@@ -12,19 +12,19 @@ router.post("/api/v1/auth/kyc/pass", authRequired, async (req: Request, res: Res
   try {
     const { name, birth, carrier, phone } = req.body ?? {};
     if (!name || !birth || !carrier || !phone) {
-      return res.fail(400, "VAL_400", "name, birth(YYYYMMDD), carrier, phone 필수입니다.");
+      return res.fail("VAL_400", "name, birth(YYYYMMDD), carrier, phone 필수입니다.", 400);
     }
 
     const age = calcAgeFromBirthYYYYMMDD(birth);
-    if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYYMMDD 입니다.");
-    if (age < 50) return res.fail(403, "KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.");
+    if (age < 0) return res.fail("VAL_400", "birth 형식은 YYYYMMDD 입니다.", 400);
+    if (age < 50) return res.fail("KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.", 403);
 
     try {
       const result = await verifyKyc({ name, birth, carrier, phone });
       if (!result.ok) {
         const code = result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH";
         const status = result.reason === "TEMPORARY_FAILURE" ? 502 : 401;
-        return res.fail(status, code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH");
+        return res.fail(code, result.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH", status);
       }
 
       const userId = String(req.user?.id);

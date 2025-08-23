@@ -4,7 +4,7 @@ import { issueOtp, verifyOtp } from "../services/register.otp";
 import { upsertActiveSession, markPhoneVerified, findActiveByPhone, completeAndDelete } from "../repos/signupSessionRepo";
 import { findByPhone, createUserWithKyc } from "../services/register.user";
 import { newJti, signAccessToken, signRefreshToken } from "../lib/jwt";
-import { saveNewRefreshToken } from "../repos/refreshTokenRepo";
+// import { saveNewRefreshToken } from "../repos/refreshTokenRepo"; // 임시 비활성화
 import { setAuthCookies } from "../lib/cookies";
 import { verifyKyc } from "../external/kyc";
 import { calcAgeFromBirthYYYYMMDD } from "../lib/age";
@@ -16,10 +16,10 @@ export const registerRouter = Router();
  */
 registerRouter.post("/register/start", async (req, res) => {
   const { phone, carrier } = req.body ?? {};
-  if (!phone || !carrier) return res.fail(400, "VAL_400", "phone, carrier 필수");
+  if (!phone || !carrier) return res.fail("VAL_400", "phone, carrier 필수", 400);
 
   if (await findByPhone(phone)) {
-    return res.fail(409, "USER_EXISTS", "이미 가입된 전화번호입니다.");
+    return res.fail("USER_EXISTS", "이미 가입된 전화번호입니다.", 409);
   }
 
   const { ttlSec, devCode } = await issueOtp(phone, "register");
@@ -32,10 +32,10 @@ registerRouter.post("/register/start", async (req, res) => {
  */
 registerRouter.post("/register/verify-code", async (req, res) => {
   const { phone, code } = req.body ?? {};
-  if (!phone || !code) return res.fail(400, "VAL_400", "phone, code 필수");
+  if (!phone || !code) return res.fail("VAL_400", "phone, code 필수", 400);
 
   const ok = await verifyOtp(phone, code, "register");
-  if (!ok) return res.fail(401, "INVALID_CODE", "코드가 올바르지 않거나 만료되었습니다.");
+  if (!ok) return res.fail("INVALID_CODE", "코드가 올바르지 않거나 만료되었습니다.", 401);
 
   await markPhoneVerified(phone);
   return res.ok({ phoneVerified: true });
@@ -47,39 +47,39 @@ registerRouter.post("/register/verify-code", async (req, res) => {
 registerRouter.post("/register/submit", async (req, res) => {
   const { phone, name, birth, gender, termsAccepted } = req.body ?? {};
   if (!phone || !name || !birth || !termsAccepted?.length) {
-    return res.fail(400, "VAL_400", "필수 항목 누락");
+    return res.fail("VAL_400", "필수 항목 누락", 400);
   }
   if (await findByPhone(phone)) {
-    return res.fail(409, "USER_EXISTS", "이미 가입된 전화번호입니다.");
+    return res.fail("USER_EXISTS", "이미 가입된 전화번호입니다.", 409);
   }
 
   const session = await findActiveByPhone(phone);
   if (!session || !session.phone_verified) {
-    return res.fail(409, "REGISTER_FLOW_ERROR", "전화번호 검증이 선행되어야 합니다.");
+    return res.fail("REGISTER_FLOW_ERROR", "전화번호 검증이 선행되어야 합니다.", 409);
   }
 
   // birth 형식을 YYYY-MM-DD로 파싱
   const birthDate = new Date(birth);
   if (isNaN(birthDate.getTime())) {
-    return res.fail(400, "VAL_400", "birth 형식은 YYYY-MM-DD");
+    return res.fail("VAL_400", "birth 형식은 YYYY-MM-DD", 400);
   }
   
   const age = calcAgeFromBirthYYYYMMDD(birth.replace(/-/g, ''));
-  if (age < 0) return res.fail(400, "VAL_400", "birth 형식은 YYYY-MM-DD");
-  if (age < 50) return res.fail(403, "KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.");
+  if (age < 0) return res.fail("VAL_400", "birth 형식은 YYYY-MM-DD", 400);
+  if (age < 50) return res.fail("KYC_AGE_RESTRICTED", "가입은 만 50세 이상부터 가능합니다.", 403);
 
   // termsAccepted에서 필수 약관 확인
   const hasTos = termsAccepted.some((t: { key: string; version: string }) => t.key === 'tos');
   const hasPrivacy = termsAccepted.some((t: { key: string; version: string }) => t.key === 'privacy');
   if (!hasTos || !hasPrivacy) {
-    return res.fail(400, "VAL_400", "tos, privacy 약관 동의 필수");
+    return res.fail("VAL_400", "tos, privacy 약관 동의 필수", 400);
   }
 
   const kyc = await verifyKyc({ name, birth, carrier: session.carrier, phone });
   if (!kyc.ok) {
     const code = kyc.reason === "TEMPORARY_FAILURE" ? "KYC_TEMPORARY_FAILURE" : "KYC_MISMATCH";
     const status = kyc.reason === "TEMPORARY_FAILURE" ? 502 : 401;
-    return res.fail(status, code, code === "KYC_MISMATCH" ? "본인정보 불일치" : "외부 연동 장애");
+    return res.fail(code, code === "KYC_MISMATCH" ? "본인정보 불일치" : "외부 연동 장애", status);
   }
 
   const userId: string = await createUserWithKyc({
@@ -95,7 +95,10 @@ registerRouter.post("/register/submit", async (req, res) => {
   const jti = newJti();
   const at = signAccessToken(userId, jti);
   const rt = signRefreshToken(userId, jti);
-  await saveNewRefreshToken({ jti, userId, token: rt, expiresAt: new Date(Date.now()+30*24*60*60*1000) });
+  // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
+  console.log('[REGISTER] 리프레시 토큰 저장 스킵 (테이블 없음):', { jti, userId });
+  // TODO: refresh_tokens 테이블 생성 후 활성화
+  // await saveNewRefreshToken({ jti, userId, token: rt, expiresAt: new Date(Date.now()+30*24*60*60*1000) });
   setAuthCookies(res, at, rt);
 
   await completeAndDelete(phone);

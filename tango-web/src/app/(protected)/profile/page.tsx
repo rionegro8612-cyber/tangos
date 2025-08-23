@@ -5,6 +5,7 @@ import { fetchMe, convertMeToUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth'; // 기존 store 유지
+import { API_BASE } from '@/lib/api';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -26,8 +27,7 @@ export default function ProfilePage() {
     }
 
     // 기존 fallback 로직 (하위 호환성)
-    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4100').replace(/\/+$/, '');
-    const urls = [`${apiBase}/api/v1/auth/me`, `${apiBase}/api/v1/me`];
+    const urls = [`${API_BASE}/auth/me`, `${API_BASE}/me`];
     
     for (const url of urls) {
       try {
@@ -51,8 +51,7 @@ export default function ProfilePage() {
 
   // 기존 logout 로직 유지
   async function logoutWithFallback() {
-    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4100').replace(/\/+$/, '');
-    const urls = [`${apiBase}/api/v1/auth/logout`, `${apiBase}/api/v1/logout`];
+    const urls = [`${API_BASE}/auth/logout`, `${API_BASE}/logout`];
     
     for (const url of urls) {
       try {

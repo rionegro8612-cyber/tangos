@@ -25,10 +25,20 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/tango
       - REDIS_URL=redis://redis:6379
-      - PHONE_ENC_KEY=${PHONE_ENC_KEY}
+      - PHONE_ENC_KEY=${PHONE_ENC_KEY:-dev-32-bytes-minimum-secret-key}
+      - NODE_ENV=development
+      - KYC_MIN_AGE=50
+      - OTP_RATE_PER_PHONE=5
+      - OTP_RATE_PHONE_WINDOW=3600
+      - OTP_RATE_PER_IP=10
+      - OTP_RATE_IP_WINDOW=3600
+      - OTP_RESEND_COOLDOWN_SEC=60
     depends_on: [db, redis]
     ports: ["4100:4100"]
-    command: ["node","dist/index.js"]
+    volumes:
+      - ./apps/server:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev"]
 
 volumes:
   pgdata:

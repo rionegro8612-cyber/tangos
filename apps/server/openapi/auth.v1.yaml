@@ -1,0 +1,409 @@
+openapi: 3.0.3
+info:
+  title: Tango Auth API v1
+  description: 표준화된 인증 API 엔드포인트
+  version: 1.0.0
+  contact:
+    name: Tango Team
+    email: dev@tango.com
+
+servers:
+  - url: http://localhost:4100/api/v1
+    description: Development server
+  - url: https://api.tango.com/api/v1
+    description: Production server
+
+paths:
+  /auth/send-sms:
+    post:
+      summary: SMS 전송
+      description: 전화번호로 인증 SMS를 전송합니다
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Phone'
+      responses:
+        '200':
+          description: SMS 전송 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ttl:
+                            type: integer
+                            description: OTP 유효 시간 (초)
+                            example: 300
+                          cooldown:
+                            type: integer
+                            description: 재전송 대기 시간 (초)
+                            example: 60
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/resend-sms:
+    post:
+      summary: SMS 재전송
+      description: 동일한 전화번호로 SMS를 재전송합니다
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Phone'
+      responses:
+        '200':
+          description: SMS 재전송 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ttl:
+                            type: integer
+                            description: OTP 유효 시간 (초)
+                            example: 300
+                          retryAfter:
+                            type: integer
+                            description: 다음 재전송까지 대기 시간 (초)
+                            example: 60
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/verify-code:
+    post:
+      summary: OTP 코드 검증
+      description: 전송된 SMS 코드를 검증합니다
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Verify'
+      responses:
+        '200':
+          description: 코드 검증 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          tokens:
+                            $ref: '#/components/schemas/AuthTokens'
+                          registrationTicket:
+                            type: object
+                            properties:
+                              expiresIn:
+                                type: integer
+                                description: 가입 티켓 유효 시간 (초)
+                                example: 1800
+                              message:
+                                type: string
+                                description: 가입 티켓 발급 메시지
+                                example: "Phone verified. You can now complete registration."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/register/submit:
+    post:
+      summary: 회원가입 최종 제출
+      description: 전화번호 검증 후 프로필 정보와 약관 동의로 회원가입을 완료합니다
+      tags:
+        - Registration
+      headers:
+        Idempotency-Key:
+          description: 더블클릭 방지를 위한 고유 키
+          required: false
+          schema:
+            type: string
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterSubmit'
+      responses:
+        '200':
+          description: 회원가입 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+components:
+  schemas:
+    StandardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 요청 성공 여부
+          example: true
+        code:
+          type: string
+          description: 응답 코드
+          example: "OK"
+        message:
+          type: string
+          description: 사용자 메시지
+          example: "SMS sent successfully"
+        data:
+          description: 응답 데이터
+        requestId:
+          type: string
+          description: 요청 추적 ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      required:
+        - success
+        - code
+        - requestId
+
+    Phone:
+      type: object
+      properties:
+        phone:
+          type: string
+          description: E.164 형식 전화번호
+          pattern: '^\+?[1-9]\d{6,14}$'
+          example: "+821012345678"
+      required:
+        - phone
+
+    Verify:
+      type: object
+      properties:
+        phone:
+          type: string
+          description: E.164 형식 전화번호
+          pattern: '^\+?[1-9]\d{6,14}$'
+          example: "+821012345678"
+        code:
+          type: string
+          description: 6자리 OTP 코드
+          pattern: '^\d{6}$'
+          example: "123456"
+      required:
+        - phone
+        - code
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 사용자 ID
+          example: 1
+        phone:
+          type: string
+          description: 전화번호
+          example: "+821012345678"
+        nickname:
+          type: string
+          description: 닉네임
+          example: "홍길동"
+        region:
+          type: string
+          description: 지역
+          example: "서울"
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: 액세스 토큰
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    RegisterSubmit:
+      type: object
+      properties:
+        profile:
+          type: object
+          properties:
+            nickname:
+              type: string
+              description: 닉네임 (2-20자)
+              minLength: 2
+              maxLength: 20
+              example: "홍길동"
+            region:
+              type: string
+              description: 지역
+              minLength: 1
+              example: "서울"
+            birthYear:
+              type: integer
+              description: 출생년도
+              minimum: 1900
+              maximum: 2024
+              example: 1990
+          required:
+            - nickname
+            - region
+            - birthYear
+        agreements:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                description: 약관 코드
+                example: "TOS"
+              version:
+                type: string
+                description: 약관 버전
+                example: "1.0"
+              required:
+                type: boolean
+                description: 필수 약관 여부
+                example: true
+              accepted:
+                type: boolean
+                description: 약관 동의 여부
+                example: true
+          minItems: 1
+          example:
+            - code: "TOS"
+              version: "1.0"
+              required: true
+              accepted: true
+            - code: "PRIVACY"
+              version: "1.0"
+              required: true
+              accepted: true
+            - code: "MARKETING"
+              version: "1.0"
+              required: false
+              accepted: false
+        referralCode:
+          type: string
+          description: 추천 코드 (선택사항)
+          example: "ABC123"
+      required:
+        - profile
+        - agreements
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/StandardResponse'
+              - type: object
+                properties:
+                  success:
+                    example: false
+                  code:
+                    example: "VALIDATION_ERROR"
+                  message:
+                    example: "Invalid phone number format"
+
+    RateLimited:
+      description: 요청 제한 초과
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/StandardResponse'
+              - type: object
+                properties:
+                  success:
+                    example: false
+                  code:
+                    example: "RATE_LIMITED"
+                  message:
+                    example: "Too many requests"
+                  data:
+                    type: object
+                    properties:
+                      retryAfter:
+                        type: integer
+                        description: 재시도까지 대기 시간 (초)
+                        example: 60
+
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/StandardResponse'
+              - type: object
+                properties:
+                  success:
+                    example: false
+                  code:
+                    example: "REG_TICKET_NOT_FOUND"
+                  message:
+                    example: "Please verify phone first"
+
+    Conflict:
+      description: 충돌 (중복 등)
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/StandardResponse'
+              - type: object
+                properties:
+                  success:
+                    example: false
+                  code:
+                    example: "NICKNAME_TAKEN"
+                  message:
+                    example: "Nickname already in use"
+
+tags:
+  - name: Authentication
+    description: 인증 관련 API
+  - name: Registration
+    description: 회원가입 관련 API

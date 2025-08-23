@@ -6,18 +6,6 @@ import { useRouter } from "next/navigation";
 import { sendSms, verifyCode, me } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
 
-// 🆕 새로운 API 함수 사용 옵션 (선택사항)
-// import { api, StandardResponse } from "@/lib/api";
-// 
-// 사용 예시:
-// const res = await api<{issued:boolean; ttlSec:number; devCode?:string}>("/auth/send-sms", {
-//   method: "POST", body: JSON.stringify({ phone })
-// });
-// 
-// const res = await api<{ userId:number; autoLogin:boolean }>("/auth/verify-login", {
-//   method: "POST", body: JSON.stringify({ phone, code })
-// });
-
 function normalizeKrPhone(input: string): string {
   const d = (input || "").replace(/\D/g, "");
   if (!d) return "";
@@ -39,16 +27,6 @@ function pickPhoneE164(res: any, fallbackRaw: string): string {
   const d = res?.data ?? res;
   return d?.phoneE164 ?? d?.phone_e164_norm ?? d?.phone ?? normalizeKrPhone(fallbackRaw);
 }
-
-function pickUser(j: any) {
-  return j?.data?.user ?? j?.user ?? (typeof j?.data === "object" ? j.data : null) ?? null;
-}
-
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  "http://localhost:4100"
-).replace(/\/+$/, "");
 
 export default function LoginPage() {
   const router = useRouter();
@@ -81,7 +59,7 @@ export default function LoginPage() {
     if (!raw) return alert("전화번호를 입력하세요.");
     setSending(true);
     try {
-      const res: any = await sendSms(raw, { dev: devMode });     // dev 옵션 객체로 전달
+      const res: any = await sendSms(raw, { dev: devMode });
       setE164(pickPhoneE164(res, raw));
       const dc = pickDevCode(res);
       setDevCode(dc ? String(dc) : undefined);
@@ -100,21 +78,18 @@ export default function LoginPage() {
     if (!raw || !c) return alert("전화번호와 인증번호를 입력하세요.");
     setVerifying(true);
     try {
-      // ✅ 쿠키를 받으려면 verifyCode 내부 fetch도 credentials:'include' 여야 합니다.
-      // 현재: /api/v1/auth/verify-code (백엔드 경로와 일치)
-      // 참고: 새로운 api 함수 사용 시 /auth/verify-login으로 변경 가능
       const verifyResult = await verifyCode(raw, c);
       
-      // ✅ 백엔드 응답에서 userId 확인
-      if (verifyResult?.data?.userId) {
+      // 백엔드 응답 형식: { success: true, data: { verified: true }, message: "OTP_VERIFIED" }
+      if (verifyResult?.success && verifyResult?.data?.verified) {
         // 로그인 성공 후 사용자 정보 가져오기
         let u: any = null;
         try {
-          const r1: any = await me();          // /api/v1/auth/me
-          u = r1?.data ?? null;
+          const r1: any = await me();          
+          u = r1?.data?.user ?? r1?.user ?? null;
         } catch { /* ignore */ }
 
-        // ✅ 유저가 확실히 생겼을 때만 /profile로 이동 (튕김 방지)
+        // 유저가 확실히 생겼을 때만 /profile로 이동
         if (u) {
           setUser(u);
           router.replace("/profile");

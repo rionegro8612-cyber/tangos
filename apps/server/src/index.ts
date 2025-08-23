@@ -58,7 +58,7 @@ if (process.env.NODE_ENV === "production") {
 } else {
   // 개발: 기본 허용 + 환경변수
   const envAllow = (frontOrigins || "").split(",").map(s => s.trim()).filter(Boolean);
-  const defaultDevAllows = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const defaultDevAllows = ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"];
   allowList = new Set(envAllow.length ? envAllow : defaultDevAllows);
 }
 

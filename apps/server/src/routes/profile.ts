@@ -101,7 +101,7 @@ profileRouter.post("/nickname", async (req, res) => {
     
     // 4) DB 업데이트 (문자열 바인딩 → ::uuid 캐스팅)
     await query(
-      `UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2::uuid`, 
+      `UPDATE users SET nickname = $1 WHERE id = $2::uuid`, 
       [nickname, userId]
     );
     
@@ -147,8 +147,7 @@ profileRouter.post("/region", async (req, res) => {
         region_label = $2, 
         region_lat = $3, 
         region_lng = $4, 
-        region_source = $5, 
-        updated_at = NOW() 
+        region_source = $5
        WHERE id = $6::uuid`,
       [code ?? null, label ?? null, lat ?? null, lng ?? null, source ?? null, userId]
     );

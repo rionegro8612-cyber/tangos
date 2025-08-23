@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '../store/auth';
 import type { AuthState } from '../store/auth';
+import { API_BASE } from '../lib/api';
 
 type AnyJson = Record<string, any> | null;
 
@@ -25,11 +26,7 @@ export default function ProfilePage() {
   const [meLoading, setMeLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const apiBase = (
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:4100'
-  ).replace(/\/+$/, '');
+  // lib/api.ts의 API_BASE 사용 (이미 /api/v1 포함됨)
 
   // 프로필 진입 시 유저가 없으면 /auth/me로 한번 보강
   useEffect(() => {
@@ -42,7 +39,7 @@ export default function ProfilePage() {
       
       setMeLoading(true);
       try {
-        const res = await fetch(`${apiBase}/api/v1/auth/me`, {
+        const res = await fetch(`${API_BASE}/auth/me`, {
           credentials: 'include',
           signal: ctl.signal,
         });
@@ -84,12 +81,12 @@ export default function ProfilePage() {
       alive = false;
       ctl.abort();
     };
-  }, [apiBase, router, setUser, user]);
+  }, [router, setUser, user]);
 
   async function handleLogout() {
     try {
       setLogoutLoading(true);
-      await fetch(`${apiBase}/api/v1/auth/logout`, {
+      await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

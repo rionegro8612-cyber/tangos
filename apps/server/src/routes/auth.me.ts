@@ -10,7 +10,7 @@ r.get("/me", authRequired, async (req: any, res) => {
     return res.ok({ user }, "ME_OK");
   } catch (error) {
     console.error("[auth.me] Error:", error);
-    return res.fail(500, "INTERNAL_ERROR", "사용자 정보를 가져오는데 실패했습니다.");
+    return res.fail("INTERNAL_ERROR", "사용자 정보를 가져오는데 실패했습니다.", 500);
   }
 });
 

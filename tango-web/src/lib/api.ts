@@ -1,7 +1,7 @@
 // tango-web/src/lib/api.ts
 
 // 새로운 API_BASE 설정 (기존과 통합)
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
+export const API_BASE = "http://localhost:4100/api/v1";
 
 // 기존 API_BASE (하위 호환성 유지)
 const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
@@ -138,25 +138,51 @@ export async function apiFetch<T = unknown>(
 // ================= Auth =================
 
 export async function sendSms(phone: string, opts?: { dev?: boolean }) {
-  // ✅ dev는 쿼리 말고 body로 넘김 (BFF 라우트와 일치)
-  return apiFetch<{ issued: boolean; ttlSec: number; devCode?: string }>(
-    "/api/v1/auth/send-sms",
-    { method: "POST", body: JSON.stringify({ phone, ...(opts?.dev ? { dev: true } : {}) }) },
-  );
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/auth/send-sms`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: 'include',
+    body: JSON.stringify({ phone, carrier: "LG", context: "dev", ...(opts?.dev ? { dev: true } : {}) }),
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
 }
 
 export async function verifyCode(phone: string, code: string) {
-  return apiFetch<{ userId: string; autoLogin: boolean }>(
-    "/api/v1/auth/verify-code",
-    { method: "POST", body: JSON.stringify({ phone, code }) },
-  );
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/auth/verify-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: 'include',
+    body: JSON.stringify({ phone, code }),
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
 }
 
 export async function me() {
-  // ✅ 백엔드 응답 형식에 맞춤
-  return apiFetch<{ id: number; phone: string; nickname: string | null }>(
-    "/api/v1/auth/me",
-  );
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    credentials: 'include',
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
 }
 
 export async function logout() {

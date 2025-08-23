@@ -37,8 +37,8 @@ export async function createUserWithKyc(input: CreateUserInput): Promise<string>
   });
   
   const rows = await query<{ id: string }>(`
-    INSERT INTO users (phone_e164_norm, is_verified, kyc_verified, kyc_provider, kyc_checked_at, birth_date, age, created_at, updated_at)
-    VALUES ($1, TRUE, TRUE, $2, NOW(), to_date($3,'YYYYMMDD'), EXTRACT(YEAR FROM AGE(to_date($3,'YYYYMMDD'))), NOW(), NOW())
+    INSERT INTO users (phone_e164_norm, is_verified, kyc_verified, kyc_provider, kyc_checked_at, birth_date, age, created_at)
+    VALUES ($1, TRUE, TRUE, $2, NOW(), to_date($3,'YYYYMMDD'), EXTRACT(YEAR FROM AGE(to_date($3,'YYYYMMDD'))), NOW())
     RETURNING id
   `, [normalizedPhone, input.kycProvider, input.birth]);
   const id = rows[0].id;

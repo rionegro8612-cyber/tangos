@@ -1,33 +1,41 @@
 import type { Request, Response, NextFunction } from "express";
 
+export type StandardResponse<T = unknown> = {
+  success: boolean;
+  code: string;
+  message?: string;
+  data?: T;
+  requestId: string;
+};
+
 declare global {
   namespace Express {
     interface Response {
-      ok<T = unknown>(data: T, message?: string, code?: string): void;
-      fail(status: number, code: string, message: string, data?: any): void;
+      ok<T = unknown>(data?: T, message?: string, code?: string): void;
+      fail(code: string, message?: string, status?: number, data?: any): void;
     }
   }
 }
 
 /** res.ok / res.fail 을 this 바인딩 없이, req/res 클로저로 안전하게 주입 */
 export function responseMiddleware(req: Request, res: Response, next: NextFunction) {
-  res.ok = function <T>(data: T, message = "OK", code = "OK") {
+  res.ok = function <T>(data?: T, message = "OK", code = "OK") {
     res.status(200).json({
       success: true,
       code,
       message,
       data,
-      requestId: (req as any).requestId ?? null,
+      requestId: (req as any).requestId ?? "",
     });
   };
 
-  res.fail = function (status: number, code: string, message: string, data: any = null) {
+  res.fail = function (code: string, message?: string, status = 400, data: any = null) {
     res.status(status).json({
       success: false,
       code,
       message,
       data,
-      requestId: (req as any).requestId ?? null,
+      requestId: (req as any).requestId ?? "",
     });
   };
 
@@ -45,6 +53,6 @@ export function standardErrorHandler(err: any, req: Request, res: Response, _nex
     code,
     message,
     data: null,
-    requestId: (req as any).requestId ?? null,
+    requestId: (req as any).requestId ?? "",
   });
 }

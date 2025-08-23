@@ -14,7 +14,7 @@ export function rateLimit(options: { key: (req: Request) => string, limit: numbe
     if (entry.count > options.limit) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       res.setHeader("Retry-After", String(retryAfter));
-      return res.fail(429, "RATE_LIMITED", "Too many requests");
+      return res.fail("RATE_LIMITED", "Too many requests", 429);
     }
     next();
   };

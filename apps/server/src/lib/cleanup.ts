@@ -18,10 +18,13 @@ export async function cleanupExpiredOtpCodes() {
 
 export async function cleanupExpiredRefreshTokens() {
   try {
-    const result = await query(
-      `DELETE FROM auth_refresh_tokens WHERE expires_at < NOW() - INTERVAL '1 day'`
-    );
-    console.log(`[cleanup] 만료된 리프레시 토큰 ${result.rowCount}개 정리`);
+    // 임시로 테이블이 없으므로 로그만 출력
+    console.log('[cleanup] 만료된 리프레시 토큰 정리 스킵 (테이블 없음)');
+    // TODO: auth_refresh_tokens 테이블 생성 후 활성화
+    // const result = await query(
+    //   `DELETE FROM auth_refresh_tokens WHERE expires_at < NOW() - INTERVAL '1 day'`
+    // );
+    // console.log(`[cleanup] 만료된 리프레시 토큰 ${result.rowCount}개 정리`);
   } catch (error) {
     console.error('[cleanup] 리프레시 토큰 정리 실패:', error);
   }

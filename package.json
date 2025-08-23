@@ -1,64 +1,28 @@
 {
-  "name": "server",
+  "name": "tango-project",
   "version": "1.0.0",
-  "private": true,
-  "description": "Tango server (Express + TypeScript)",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Tango project with migration management",
+  "main": "index.js",
   "scripts": {
-    "dev": "dotenv -e ../../.env -- ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "dotenv -e ../../.env -- tsc",
-    "start": "dotenv -e ../../.env -- node dist/index.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate:stage1": "node scripts/migration-manager.js stage1",
+    "migrate:stage2": "node scripts/migration-manager.js stage2",
+    "migrate:status": "node scripts/migration-manager.js status",
+    "migrate:rollback": "node scripts/migration-manager.js rollback",
+    "health:start": "node scripts/health-check.js start",
+    "health:check": "node scripts/health-check.js check",
+    "health:status": "node scripts/health-check.js status",
+    "migrate:up": "./migrate-up.sh",
+    "migrate:down": "./migrate-down.sh"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rionegro8612-cyber/tangos.git"
-  },
-  "keywords": [],
+  "keywords": ["migration", "database", "deployment"],
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/rionegro8612-cyber/tangos/issues"
-  },
-  "homepage": "https://github.com/rionegro8612-cyber/tangos#readme",
   "dependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dayjs": "^1.11.13",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "helmet": "^6.2.0",
-    "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.1",
-    "next": "^15.4.6",
-    "pg": "^8.16.3",
-    "postcss": "^8.5.6",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "tailwindcss": "^4.1.12",
-    "twilio": "^5.8.0",
-    "uuid": "^11.1.0",
-    "zustand": "^5.0.7"
+    "pg": "^8.16.3"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.9",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/morgan": "^1.9.10",
-    "@types/next": "^8.0.7",
-    "@types/node": "^24.3.0",
-    "@types/pg": "^8.15.5",
-    "@types/react": "^19.1.10",
-    "@types/uuid": "^10.0.0",
-    "dotenv-cli": "^10.0.0",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.2"
-  },
-  "engines": {
-    "node": ">=18"
+    "dotenv-cli": "^7.4.2"
   }
 }
