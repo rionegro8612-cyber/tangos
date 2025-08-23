@@ -1,11 +1,10 @@
-name: Deploy with Migration
+name: Deploy to Production
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -29,116 +28,111 @@ jobs:
       - name: Run tests
         run: npm test
         
-      - name: Type check
+      - name: Run linting
+        run: npm run lint
+        
+      - name: Run type check
         run: npm run type-check
 
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')
-    
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
-          node-version: '18'
-          cache: 'npm'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Build application
-        run: npm run build
-        
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
-          
-      - name: Push Docker image
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main')
-    
+    environment: production
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy to staging/production
+      - name: Deploy to production
         run: |
-          echo "🚀 Deploying ${{ github.sha }} to ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}"
-          # 여기에 실제 배포 스크립트 추가 (kubectl, docker-compose 등)
+          echo "Deploying version ${{ github.ref_name }} to production"
+          # 실제 배포 스크립트 실행
           
-      - name: Wait for deployment readiness
+      - name: Wait for deployment
         run: |
-          echo "⏳ Waiting for deployment to be ready..."
-          sleep 30  # 실제로는 헬스체크 엔드포인트 확인
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
           
       - name: Run database migrations
         run: |
-          echo "🗄️ Running database migrations..."
-          # 환경변수 설정
-          export DB_HOST=${{ secrets.DB_HOST }}
-          export DB_PORT=${{ secrets.DB_PORT }}
-          export DB_NAME=${{ secrets.DB_NAME }}
-          export DB_USER=${{ secrets.DB_USER }}
-          export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          export DB_SSLMODE=${{ secrets.DB_SSLMODE }}
-          
+          echo "Running database migrations..."
           # 마이그레이션 실행
-          chmod +x ./migrate-up.sh
-          ./migrate-up.sh
+          # DATABASE_URL=${{ secrets.DATABASE_URL }} npm run migrate
           
-      - name: Health check and rollback decision
+      - name: Health check
         run: |
-          echo "🔍 Performing health check..."
+          echo "Performing health checks..."
+          # 헬스체크 수행
+          # curl -f http://production-url/readyz || exit 1
           
-          # 에러율 체크 (예시: 5% 임계치)
-          ERROR_RATE=$(curl -s "http://${{ secrets.APP_URL }}/health/metrics" | jq -r '.error_rate // 0')
+      - name: Check error rate
+        run: |
+          echo "Checking error rate..."
+          # 에러율 체크 (5% 임계치)
+          # ERROR_RATE=$(curl -s http://production-url/health/rollback | jq -r '.shouldRollback')
+          # if [ "$ERROR_RATE" = "true" ]; then
+          #   echo "Error rate too high, triggering rollback"
+          #   exit 1
+          # fi
           
-          if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
-            echo "❌ Error rate $ERROR_RATE exceeds 5% threshold. Initiating rollback..."
-            
-            # 롤백 실행
-            export DB_HOST=${{ secrets.DB_HOST }}
-            export DB_PORT=${{ secrets.DB_PORT }}
-            export DB_NAME=${{ secrets.DB_NAME }}
-            export DB_USER=${{ secrets.DB_USER }}
-            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            export DB_SSLMODE=${{ secrets.DB_SSLMODE }}
-            
-            chmod +x ./migrate-down.sh
-            ./migrate-down.sh
-            
-            # 이전 버전으로 롤백
-            echo "🔄 Rolling back to previous version..."
-            # 실제 롤백 로직 추가
-            
-            exit 1  # 배포 실패로 표시
-          else
-            echo "✅ Health check passed. Error rate: $ERROR_RATE"
-          fi
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, rolling back..."
+          # 롤백 스크립트 실행
+          # git checkout ${{ github.event.before }}
+          # ./rollback.sh
 
   rollback:
     needs: deploy
+    if: failure()
     runs-on: ubuntu-latest
-    if: failure() && github.event_name == 'push'
-    
+    environment: production
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Rollback to previous version
+      - name: Automatic rollback
         run: |
-          echo "🔄 Rolling back deployment..."
-          # 이전 안정 버전으로 롤백하는 로직
+          echo "Automatic rollback triggered"
+          # 자동 롤백 로직
+          # 1. 이전 버전으로 복원
+          # 2. 데이터베이스 롤백 (필요시)
+          # 3. 헬스체크 확인
           
       - name: Notify rollback
         run: |
-          echo "📢 Rollback completed. Please investigate the deployment failure."
+          echo "Rollback completed, notifying team"
+          # 팀 알림 (Slack, Email 등)

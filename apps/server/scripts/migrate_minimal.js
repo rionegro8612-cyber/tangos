@@ -37,7 +37,11 @@ CREATE TABLE IF NOT EXISTS auth_sms_codes (
   attempt_count INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone ON auth_sms_codes(phone_e164_norm);
+
+-- OTP 정책을 위한 복합 인덱스 (phone + expire_at)
+CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone_expire ON auth_sms_codes(phone_e164_norm, expire_at);
+-- 요청 제한을 위한 인덱스
+CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone_created ON auth_sms_codes(phone_e164_norm, created_at);
 
 CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
   id BIGSERIAL PRIMARY KEY,

@@ -209,8 +209,13 @@ export const createError = {
   rateLimit: (message?: string) => new StandardError('RATE_LIMIT', message),
   unauthorized: (message?: string) => new StandardError('UNAUTHORIZED', message),
   userNotFound: (message?: string) => new StandardError('USER_NOT_FOUND', message),
+  duplicateUser: (message?: string) => new StandardError('DUPLICATE_USER', message),
+  missingParameter: (message?: string) => new StandardError('MISSING_PARAMETER', message),
+  invalidFormat: (message?: string) => new StandardError('INVALID_FORMAT', message),
+  validationError: (message?: string) => new StandardError('VALIDATION_ERROR', message),
   kycAgeFailed: (age: number) => new StandardError('KYC_AGE_RESTRICTION', `연령 제한: ${age}세는 서비스 이용이 불가합니다`),
   kycMismatch: (message?: string) => new StandardError('KYC_INFO_MISMATCH', message),
+  kycVerificationFailed: (message?: string) => new StandardError('KYC_VERIFICATION_FAILED', message),
   internalError: (message?: string, data?: any) => new StandardError('INTERNAL_ERROR', message, data),
   externalApiError: (service: string, error?: any) => new StandardError('EXTERNAL_API_ERROR', `${service} 연동 실패`, error)
 };
