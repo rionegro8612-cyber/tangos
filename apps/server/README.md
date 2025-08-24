@@ -1,6 +1,42 @@
-# Server
+# Tango Server
 
-Express.js 기반의 서버 애플리케이션입니다.
+Express + TypeScript 기반 백엔드 서버
+
+## Standard API Endpoints
+
+표준 엔드포인트 (외부 계약 고정):
+
+- `POST /api/v1/auth/send-sms` - SMS 전송
+- `POST /api/v1/auth/resend-sms` - SMS 재전송  
+- `POST /api/v1/auth/verify-code` - OTP 검증 → `{ isNew: boolean }`
+- `POST /api/v1/auth/signup` - 최종 1회 제출(약관 동의 시점)
+
+## OTP Policy
+
+- **TTL**: 300초 (5분)
+- **재전송 쿨다운**: 60초 (1분)
+- **레이트 리밋**: 
+  - 전화번호별: 1일 5회
+  - IP별: 1일 10회
+  - 재전송: 1분 3회
+
+## Port Configuration
+
+- **Server**: 4100 (Express/TypeScript)
+- **Web Client**: 3000 (Next.js)
+
+## Environment Variables
+
+주요 환경변수:
+
+```bash
+PORT=4100
+OTP_CODE_TTL_SEC=300          # OTP 코드 유효시간 (초)
+OTP_RESEND_COOLDOWN_SEC=60    # 재전송 쿨다운 (초)
+OTP_MAX_ATTEMPTS=3            # 최대 시도 횟수
+OTP_RATE_PER_PHONE=5          # 전화번호별 1일 제한
+OTP_RATE_PER_IP=10            # IP별 1일 제한
+```
 
 ## 설치
 

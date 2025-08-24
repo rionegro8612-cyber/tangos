@@ -23,10 +23,26 @@ function getCookieDomain(): string | undefined {
 
 /** 공통 기본 옵션 */
 function baseCookieOptions(maxAgeMs: number): CookieOptions {
+  const secure = process.env.COOKIE_SECURE === "true" || isProd;
+  const sameSite = process.env.COOKIE_SAMESITE?.toLowerCase() || (isProd ? "none" : "lax");
+  
+  // 프로덕션에서 SameSite=none일 때 secure=true 필수
+  if (sameSite === "none" && !secure) {
+    console.warn("[COOKIE] SameSite=none requires secure=true, falling back to lax");
+    return {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax" as any,
+      path: "/",
+      maxAge: maxAgeMs,
+      domain: getCookieDomain(),
+    };
+  }
+  
   return {
     httpOnly: true,
-    secure: isProd,                       // prod: true, dev: false
-    sameSite: (isProd ? "none" : "lax") as any,
+    secure,
+    sameSite: sameSite as any,
     path: "/",
     maxAge: maxAgeMs,
     domain: getCookieDomain(),

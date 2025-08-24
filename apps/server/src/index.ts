@@ -36,8 +36,37 @@ app.use(helmet({
   crossOriginEmbedderPolicy: true,
   crossOriginOpenerPolicy: { policy: "same-origin" },
   crossOriginResourcePolicy: { policy: "same-origin" },
-  contentSecurityPolicy: false, // 기존 설정 유지
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1년
+    includeSubDomains: true,
+    preload: true,
+  },
+  noSniff: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 }));
+
+// HTTPS 강제 리다이렉트 (프로덕션에서만)
+if (process.env.NODE_ENV === "production" && process.env.FORCE_HTTPS === "true") {
+  app.use((req, res, next) => {
+    if (req.headers["x-forwarded-proto"] !== "https") {
+      return res.redirect(`https://${req.headers.host}${req.url}`);
+    }
+    next();
+  });
+}
 
 // 로깅 설정 (프로덕션에서는 간소화)
 if (process.env.NODE_ENV === "production") {
@@ -90,6 +119,29 @@ app.use(metricsMiddleware); // 🆕 Added: HTTP 요청 메트릭 수집
 // ▼ 헬스체크 (항상 라우터 마운트보다 위에!)
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("OK"));
 app.get("/api/v1/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
+
+// 🆕 Kubernetes 표준 헬스체크 엔드포인트 추가
+app.get("/livez", (_req, res) => res.status(200).type("text/plain").send("OK"));
+app.get("/readyz", async (_req, res) => {
+  try {
+    // 데이터베이스 연결 상태 확인
+    const dbClient = new (require('pg').Client)({ connectionString: process.env.DATABASE_URL });
+    await dbClient.connect();
+    await dbClient.query('SELECT 1');
+    await dbClient.end();
+    
+    // Redis 연결 상태 확인
+    const redis = require('redis').createClient({ url: process.env.REDIS_URL });
+    await redis.connect();
+    await redis.ping();
+    await redis.disconnect();
+    
+    res.status(200).type("text/plain").send("OK");
+  } catch (error) {
+    console.error('[READYZ] Health check failed:', error);
+    res.status(503).type("text/plain").send("Service Unavailable");
+  }
+});
 
 // 🆕 메트릭 엔드포인트 추가
 app.get("/metrics", async (_req, res) => {

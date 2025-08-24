@@ -1,7 +1,7 @@
 // tango-web/src/lib/api.ts
 
-// 새로운 API_BASE 설정 (기존과 통합)
-export const API_BASE = "http://localhost:4100/api/v1";
+// 새로운 API_BASE 설정 (환경변수 기반)
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4100/api/v1";
 
 // 기존 API_BASE (하위 호환성 유지)
 const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
@@ -143,7 +143,7 @@ export async function sendSms(phone: string, opts?: { dev?: boolean }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, carrier: "LG", context: "dev", ...(opts?.dev ? { dev: true } : {}) }),
+    body: JSON.stringify({ phone, carrier: "LG", context: "signup", ...(opts?.dev ? { dev: true } : {}) }),
   });
   
   if (!res.ok) {
@@ -160,7 +160,24 @@ export async function verifyCode(phone: string, code: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, code }),
+    body: JSON.stringify({ phone, code, context: "signup" }),
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
+}
+
+export async function signup(phone: string, code: string) {
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: 'include',
+    body: JSON.stringify({ phone, code, context: "signup" }),
   });
   
   if (!res.ok) {

@@ -12,7 +12,11 @@
     "build": "dotenv -e ./.env --overload -- tsc",
     "start": "dotenv -e ./.env --overload -- node dist/index.js",
     "start:prod": "dotenv -e ./.env.prod -- node dist/index.js",
-    "build:ci": "tsc"
+    "start:staging": "dotenv -e ./.env.staging -- node dist/index.js",
+    "build:ci": "tsc",
+    "test:security": "node scripts/test-security.js",
+    "test:security:prod": "NODE_ENV=production node scripts/test-security.js",
+    "test:metrics": "node scripts/test-metrics.js"
   },
   "repository": {
     "type": "git",

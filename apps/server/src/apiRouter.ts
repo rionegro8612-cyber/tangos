@@ -1,7 +1,6 @@
 import { Router } from "express";
 
 // 기존 라우터
-import { loginRouter } from "./routes/auth.login";
 import { refreshRouter } from "./routes/auth.refresh";
 import { logoutRouter } from "./routes/auth.logout";
 import { kycRouter } from "./routes/kyc";
@@ -11,18 +10,21 @@ import { registerRouter } from "./routes/auth.register";
 import profileRouter from "./routes/profile";
 import { locationRouter } from "./routes/location";
 import { authRouter as authMvpRouter } from "./routes/auth.mvp";
+import { loginRouter } from "./routes/auth.login";
 
 export const router = Router();
 
-// 기존
-router.use("/auth", loginRouter);    // /api/v1/auth/send-sms, /verify-login, /me
-router.use("/auth", refreshRouter);  // /api/v1/auth/refresh
-router.use("/auth", logoutRouter);   // /api/v1/auth/logout
-router.use("/auth", kycRouter);      // /api/v1/auth/kyc/*
+// ✅ 표준 인증 라우터 (send-sms, resend-sms, verify-code, signup)
+router.use("/auth", authMvpRouter);
 
-// ★ 신규 회원가입/프로필 라우터 장착
-router.use("/auth", registerRouter); // /api/v1/auth/register/*
-router.use("/auth", authMvpRouter);  // /api/v1/auth/* (send-sms, verify-code, logout, me)
+// ✅ 로그인 전용 라우터 (send-sms, verify-code, me)
+router.use("/auth/login", loginRouter);
+
+// ✅ 기존 기능들 (별도 경로로 분리)
+router.use("/auth/refresh", refreshRouter);  // /api/v1/auth/refresh
+router.use("/auth/logout", logoutRouter);    // /api/v1/auth/logout
+router.use("/auth/kyc", kycRouter);         // /api/v1/auth/kyc/*
+router.use("/auth/register", registerRouter); // /api/v1/auth/register/*
 
 // ✅ 프로필 라우터 마운트
 router.use("/profile", profileRouter);

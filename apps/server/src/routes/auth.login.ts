@@ -6,6 +6,7 @@ import { findByPhone, getUserProfile } from "../repos/userRepo";
 import * as otp from "../otpStore";
 import authJwt from "../middlewares/authJwt";
 import { normalizeE164 } from "../lib/phone";
+import { recordOtpSend, recordOtpVerify, recordUserLogin } from "../lib/metrics";
 
 export const loginRouter = Router();
 
@@ -35,6 +36,9 @@ loginRouter.post("/send-sms", async (req, res) => {
     console.log(`[DEV] SMS to ${e164}: [Tango] 인증번호: ${code}`);
   }
   
+  // 🆕 메트릭: OTP 전송 성공
+  recordOtpSend('success', 'MOCK', 'unknown');
+  
   const devCode = process.env.NODE_ENV !== "production" ? code : undefined;
   return res.ok({ issued: true, ttlSec: 300, ...(devCode ? { devCode } : {}) }, "OK");
 });
@@ -46,7 +50,14 @@ loginRouter.post("/verify-login", async (req, res) => {
 
   const e164 = normalizeE164(phone);
   const ok = otp.verifyCode(e164, code, "login");
-  if (!ok) return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
+  if (!ok) {
+    // 🆕 메트릭: OTP 검증 실패
+    recordOtpVerify('fail', 'INVALID_CODE');
+    return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
+  }
+  
+  // 🆕 메트릭: OTP 검증 성공
+  recordOtpVerify('success', 'VALID_CODE');
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -64,6 +75,10 @@ loginRouter.post("/verify-login", async (req, res) => {
   //   ip: req.ip ?? undefined,
   // });
   setAuthCookies(res, at, rt);
+  
+  // 🆕 메트릭: 사용자 로그인 성공
+  recordUserLogin('success', 'LOGIN_OK');
+  
   return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
@@ -74,7 +89,14 @@ loginRouter.post("/verify-code", async (req, res) => {
 
   const e164 = normalizeE164(phone);
   const ok = otp.verifyCode(e164, code, "login");
-  if (!ok) return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
+  if (!ok) {
+    // 🆕 메트릭: OTP 검증 실패
+    recordOtpVerify('fail', 'INVALID_CODE');
+    return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
+  }
+  
+  // 🆕 메트릭: OTP 검증 성공
+  recordOtpVerify('success', 'VALID_CODE');
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -92,6 +114,10 @@ loginRouter.post("/verify-code", async (req, res) => {
   //   ip: req.ip ?? undefined,
   // });
   setAuthCookies(res, at, rt);
+  
+  // 🆕 메트릭: 사용자 로그인 성공
+  recordUserLogin('success', 'LOGIN_OK');
+  
   return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
