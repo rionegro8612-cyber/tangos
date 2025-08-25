@@ -99,53 +99,27 @@ APP_URL=http://localhost:3000
 
 CI/CD 파이프라인을 위해 다음 secrets를 설정하세요:
 
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_SSLMODE`
-- `APP_URL`
+## 🚀 CI/CD 환경 설정 완료
 
-## 📊 모니터링
+이 프로젝트는 GitHub Actions를 통한 자동화된 CI/CD 파이프라인이 구축되어 있습니다.
 
-### 헬스체크 메트릭
+### CI 체크 목록
 
-- HTTP 상태 코드
-- 에러율 (롤백 기준: 5%)
-- CPU/메모리 사용률
-- 응답 시간
-- 데이터베이스 연결 상태
+- **통합 CI 검증**: TypeScript 타입 체크, ESLint 린팅, Jest 테스트, Next.js 빌드, Prettier 포맷 체크
 
-### 자동 롤백
+### 워크플로우
 
-에러율이 5%를 초과하면 자동으로 롤백이 실행됩니다:
+- **PR CI**: Pull Request 시 자동 검증
+- **Main CI**: main 브랜치 푸시 시 자동 검증
 
-1. 마이그레이션 롤백
-2. 이전 버전으로 애플리케이션 롤백
-3. 알림 발송
+### 개발 도구
 
-## 📚 문서
+- **TypeScript**: 엄격한 타입 체크
+- **ESLint**: 코드 품질 관리
+- **Prettier**: 코드 포맷팅
+- **Jest**: 단위 테스트
 
-- [마이그레이션 운영 규칙](./docs/MIGRATION_OPERATIONS.md)
-- [CI/CD 파이프라인 설정](./docs/CI_CD_SETUP.md)
-- [헬스체크 엔드포인트 구현](./docs/HEALTH_CHECK_ENDPOINTS.md)
+### 모노레포 구조
 
-## 🚨 주의사항
-
-- **Stage 2 실행 전 반드시 코드 배포 완료 확인**
-- **구필드 제거는 되돌릴 수 없음**
-- **프로덕션 환경에서는 SSL 연결 필수**
-- **롤백 실행 시 데이터 손실 가능성 있음**
-
-## 🤝 기여
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 라이선스
-
-This project is licensed under the ISC License.
+- **apps/server**: Express.js 백엔드 서버
+- **tango-web**: Next.js 프론트엔드 애플리케이션

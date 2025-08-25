@@ -13,6 +13,7 @@ on:
 
 jobs:
   ci:
+    name: "통합 CI 검증 (Type/Lint/Test/Build/Format)"
     runs-on: ubuntu-latest
     
     strategy:
