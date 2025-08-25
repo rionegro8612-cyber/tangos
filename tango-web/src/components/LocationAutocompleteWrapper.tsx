@@ -5,12 +5,12 @@ import LocationAutocompleteV2 from './LocationAutocompleteV2';
 
 // 기존과 새로운 컴포넌트의 타입을 통합
 interface LocationItem {
-  label?: string;
-  name?: string;
-  code?: string | null;
-  regionCode?: string;
-  lat: number | null;
-  lng: number | null;
+  label: string;
+  name: string;
+  code: string | null;
+  regionCode: string;
+  lat: number;
+  lng: number;
   source: "kakao" | "vworld" | "local";
 }
 
@@ -34,23 +34,25 @@ export default function LocationAutocompleteWrapper({
     return (
       <LocationAutocompleteV2
         value={selectedLocation ? {
-          name: selectedLocation.name || selectedLocation.label || '',
-          lat: selectedLocation.lat || 0,
-          lng: selectedLocation.lng || 0,
-          regionCode: selectedLocation.regionCode || selectedLocation.code || undefined
+          name: selectedLocation.name,
+          lat: selectedLocation.lat,
+          lng: selectedLocation.lng,
+          regionCode: selectedLocation.regionCode
         } : undefined}
         onSelect={(item) => {
-          const locationItem: LocationItem = {
-            name: item.name,
-            label: item.name,
-            code: item.regionCode || null,
-            regionCode: item.regionCode,
-            lat: item.lat,
-            lng: item.lng,
-            source: item.source
-          };
-          setSelectedLocation(locationItem);
-          onSelect(locationItem);
+          if (item) {
+            const locationItem: LocationItem = {
+              name: item.name,
+              label: item.name,
+              code: item.regionCode || null,
+              regionCode: item.regionCode || '',
+              lat: item.lat,
+              lng: item.lng,
+              source: 'local' as const
+            };
+            setSelectedLocation(locationItem);
+            onSelect(locationItem);
+          }
         }}
         placeholder={placeholder}
         className={className}
@@ -62,17 +64,19 @@ export default function LocationAutocompleteWrapper({
   return (
     <LocationAutocomplete
       onSelect={(item) => {
-        const locationItem: LocationItem = {
-          label: item.label,
-          name: item.label,
-          code: item.code,
-          regionCode: item.code,
-          lat: item.lat,
-          lng: item.lng,
-          source: item.source
-        };
-        setSelectedLocation(locationItem);
-        onSelect(locationItem);
+        if (item.lat && item.lng) {
+          const locationItem: LocationItem = {
+            label: item.label || '',
+            name: item.label || '',
+            code: item.code,
+            regionCode: item.code || '',
+            lat: item.lat,
+            lng: item.lng,
+            source: item.source
+          };
+          setSelectedLocation(locationItem);
+          onSelect(locationItem);
+        }
       }}
       placeholder={placeholder}
       className={className}

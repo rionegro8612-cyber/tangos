@@ -3,9 +3,16 @@ import { useEffect, useRef, useState } from 'react';
 import { searchLocations, LocItem } from '../lib/location';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
+type LocationValue = {
+  name: string;
+  lat: number;
+  lng: number;
+  regionCode?: string;
+};
+
 type Props = {
-  value?: { name: string; lat: number; lng: number; regionCode?: string };
-  onSelect?: (v: Props['value']) => void;
+  value?: LocationValue | undefined;
+  onSelect?: (v: LocationValue | undefined) => void;
   label?: string;
   placeholder?: string;
   className?: string;
@@ -59,12 +66,15 @@ export default function LocationAutocompleteV2({
   const handleSelect = (item: LocItem) => {
     setQ(item.name);
     setOpen(false);
-    onSelect?.({
+    
+    const locationValue: LocationValue = {
       name: item.name,
       lat: item.lat,
       lng: item.lng,
-      regionCode: item.regionCode
-    });
+      ...(item.regionCode && { regionCode: item.regionCode })
+    };
+    
+    onSelect?.(locationValue);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

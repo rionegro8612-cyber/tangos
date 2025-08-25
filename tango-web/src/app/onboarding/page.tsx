@@ -14,13 +14,12 @@ interface LocationData {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState('');
   const [nickname, setNickname] = useState('');
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // sessionStorage에서 전화번호 가져오기
+  // sessionStorage에서 전화번호 확인
   useEffect(() => {
     const storedPhone = sessionStorage.getItem('phone');
     const phoneVerified = sessionStorage.getItem('phoneVerified');
@@ -29,8 +28,6 @@ export default function OnboardingPage() {
       router.replace('/register/phone');
       return;
     }
-    
-    setPhone(storedPhone);
   }, [router]);
 
   // 프로필 저장

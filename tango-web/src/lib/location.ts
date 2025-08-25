@@ -38,7 +38,7 @@ export async function searchLocations(query: string, signal?: AbortSignal): Prom
       const r = await fetch(
         `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&size=5`, 
         {
-          signal,
+          ...(signal && { signal }),
           headers: { Authorization: `KakaoAK ${kakaoKey}` }
         }
       );
@@ -70,7 +70,7 @@ export async function searchLocations(query: string, signal?: AbortSignal): Prom
     try {
       const vworldUrl = `https://api.vworld.kr/req/search?service=search&version=2.0&request=search&size=5&query=${encodeURIComponent(q)}&type=address&category=road&format=json&errorformat=json&key=${vworldKey}`;
       
-      const r = await fetch(vworldUrl, { signal });
+      const r = await fetch(vworldUrl, { ...(signal && { signal }) });
       if (r.ok) {
         const j = await r.json();
         const items: LocItem[] = (j.response?.result?.items || []).map((it: any) => ({

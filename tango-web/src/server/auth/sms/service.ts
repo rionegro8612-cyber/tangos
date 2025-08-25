@@ -22,6 +22,10 @@ export async function requestCode(rawPhone: string, purpose = "login") {
   // 실제 SMS 연동 대신 콘솔 출력 (개발용)
   console.log(`[SMS][DEV] ${phoneE164} → [탱고] 인증코드: ${code} (${TTL_MIN}분 유효)`);
 
+  if (!row) {
+    return { ok: false as const, reason: "INSERT_FAILED" as const };
+  }
+
   const ttlSec = Math.max(1, Math.floor((new Date(row.expires_at).getTime() - Date.now()) / 1000));
   return { ok: true as const, phoneE164, expiresInSec: ttlSec };
 }

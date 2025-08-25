@@ -44,7 +44,11 @@ export default function LocationAutocomplete({
       setIsLoading(true);
       try {
         const response = await api<{ items: LocationItem[] }>(`/location/search?q=${encodeURIComponent(query.trim())}`);
-        setResults(response.data.items);
+        if (response.data?.items) {
+          setResults(response.data.items);
+        } else {
+          setResults([]);
+        }
         setShowDropdown(true);
         setSelectedIndex(-1);
       } catch (error) {
@@ -92,7 +96,7 @@ export default function LocationAutocomplete({
         break;
       case "Enter":
         e.preventDefault();
-        if (selectedIndex >= 0) {
+        if (selectedIndex >= 0 && results[selectedIndex]) {
           handleSelect(results[selectedIndex]);
         }
         break;

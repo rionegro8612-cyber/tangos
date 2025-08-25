@@ -32,7 +32,6 @@ type OtpRecord = {
       expiresAt: now + TTL_SEC * SEC,
       attempts: 0,
       lastSentAt: now,
-      lockedUntil: undefined,
     };
     store.set(phone, rec);
     return rec;
@@ -60,7 +59,7 @@ type OtpRecord = {
     const rec = store.get(phone);
     if (!rec || !rec.lockedUntil) return false;
     if (Date.now() < rec.lockedUntil) return true;
-    rec.lockedUntil = undefined;
+    delete rec.lockedUntil;
     rec.attempts = 0;
     return false;
   }

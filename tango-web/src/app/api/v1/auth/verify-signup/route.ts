@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     console.log("[verify-signup] success:", { userId: mockUserId, name });
 
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       success: true, 
       message: "SIGNUP_OK", 
       data: {
@@ -131,14 +131,24 @@ export async function POST(req: NextRequest) {
         refreshToken: mockRefreshToken,
         profile: { name }
       }
-    }, {
-      headers: {
-        'Set-Cookie': [
-          `access_token=${mockAccessToken}; HttpOnly; Secure; SameSite=Lax; Path=/`,
-          `refresh_token=${mockRefreshToken}; HttpOnly; Secure; SameSite=Lax; Path=/`
-        ]
-      }
     });
+    
+    // Set-Cookie 헤더를 개별적으로 설정
+    response.cookies.set('access_token', mockAccessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/'
+    });
+    
+    response.cookies.set('refresh_token', mockRefreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/'
+    });
+    
+    return response;
     
   } catch (error) {
     console.error("[verify-signup] error:", error);

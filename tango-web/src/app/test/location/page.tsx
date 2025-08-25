@@ -14,9 +14,11 @@ export default function LocationTestPage() {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [useNewVersion, setUseNewVersion] = useState(true);
 
-  const handleLocationSelect = (location: LocationData) => {
-    setSelectedLocation(location);
-    console.log('선택된 위치:', location);
+  const handleLocationSelect = (location: LocationData | undefined) => {
+    if (location) {
+      setSelectedLocation(location);
+      console.log('선택된 위치:', location);
+    }
   };
 
   return (
@@ -70,7 +72,7 @@ export default function LocationTestPage() {
                     name: item.name || item.label || '',
                     lat: item.lat,
                     lng: item.lng,
-                    regionCode: item.regionCode || item.code || undefined
+                    regionCode: item.regionCode || item.code || ''
                   });
                 }
               }}
