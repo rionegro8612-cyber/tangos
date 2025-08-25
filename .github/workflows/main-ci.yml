@@ -1,0 +1,10 @@
+name: Main CI (no deploy)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  reuse-pr-ci:
+    uses: ./.github/workflows/pr.yml
+    secrets: inherit

@@ -2,6 +2,8 @@
   "name": "tango-project",
   "version": "1.0.0",
   "description": "Tango project with migration management",
+  "private": true,
+  "workspaces": ["apps/server", "tango-web"],
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -13,7 +15,13 @@
     "health:check": "node scripts/health-check.js check",
     "health:status": "node scripts/health-check.js status",
     "migrate:up": "./migrate-up.sh",
-    "migrate:down": "./migrate-down.sh"
+    "migrate:down": "./migrate-down.sh",
+    "ci:install": "npm ci",
+    "ci:typecheck": "npm run -w apps/server typecheck && npm run -w tango-web type-check",
+    "ci:lint": "npm run -w apps/server lint && npm run -w tango-web lint",
+    "ci:test": "npm run -w apps/server test --if-present && npm run -w tango-web test --if-present",
+    "ci:build": "npm run -w apps/server build && npm run -w tango-web build",
+    "ci:format:check": "npm run -w apps/server format:check --if-present && npm run -w tango-web format:check --if-present"
   },
   "keywords": ["migration", "database", "deployment"],
   "author": "",
