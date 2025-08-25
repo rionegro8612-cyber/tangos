@@ -1,4 +1,4 @@
-import { ApiError, apiFetchNew } from '@/lib/api';
+import { me as apiMe } from '@/lib/api';
 
 export type Me = {
   userId: string;
@@ -13,16 +13,11 @@ export type Me = {
 
 export async function fetchMe(): Promise<Me|null> {
   try {
-    const r = await apiFetchNew<Me>('/api/v1/auth/me', {
-      method: 'GET',
-      credentials: 'include', // 쿠키로 인증
-      headers: { /* 절대 X-User-Id 넣지 않기 */ },
-    });
+    const r = await apiMe();
     return r.data!;
-  } catch (e) {
-    const err = e as ApiError;
-    if (err.status === 401) return null;
-    throw err;
+  } catch (e: any) {
+    if (e.status === 401) return null;
+    throw e;
   }
 }
 

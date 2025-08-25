@@ -1,7 +1,10 @@
 // tango-web/src/lib/api.ts
 
-// 새로운 API_BASE 설정 (환경변수 기반)
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4100/api/v1";
+// 통일된 API_BASE 설정 (백엔드 서버 직접 호출)
+export const API_BASE = (
+  process.env.NEXT_PUBLIC_API_BASE_URL || 
+  "http://localhost:4100"
+).replace(/\/+$/, "") + "/api/v1";
 
 // 기존 API_BASE (하위 호환성 유지)
 const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
@@ -84,9 +87,9 @@ export async function apiFetchNew<T>(input: RequestInfo, init?: RequestInit): Pr
 
 // 기존 함수들 (하위 호환성 유지)
 function buildUrl(path: string) {
-  // 절대 URL이면 그대로, 상대경로면 API_BASE 붙임(기본은 빈 문자열 → 같은 오리진)
+  // 백엔드 서버로 직접 요청
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_LEGACY}${path}`;
+  return `${API_BASE}${path}`;
 }
 
 function isJson(res: Response) {
@@ -114,25 +117,48 @@ async function raw(path: string, init: RequestInit = {}) {
   return { res, json };
 }
 
-/** 401이면 /auth/refresh 1회 시도 후 재요청 (엔드포인트 없으면 그냥 패스) */
+/** 백엔드 직접 호출로 통일된 apiFetch */
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {},
 ): Promise<StandardResponseLegacy<T>> {
-  const first = await raw(path, init);
-  if (first.res.status !== 401) {
-    // JSON이 아니어도 최소 형태로 맞춰 반환
-    return (first.json as StandardResponseLegacy<T>) ?? ({ success: first.res.ok, data: null } as any);
+  try {
+    // 백엔드 서버로 직접 요청
+    const res = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+      ...init,
+    });
+    
+    if (res.status === 401) {
+      // refresh 시도
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, { 
+          method: "POST",
+          credentials: "include"
+        });
+        
+        if (refreshRes.ok) {
+          // refresh 성공 시 원래 요청 재시도
+          const retryRes = await fetch(`${API_BASE}${path}`, {
+            credentials: "include",
+            headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+            ...init,
+          });
+          
+          const retryJson = await safeJson<StandardResponseLegacy<T>>(retryRes);
+          return retryJson ?? ({ success: retryRes.ok, data: null } as any);
+        }
+      } catch {
+        // refresh 실패 시 무시
+      }
+    }
+    
+    const json = await safeJson<StandardResponseLegacy<T>>(res);
+    return json ?? ({ success: res.ok, data: null } as any);
+  } catch (error) {
+    return { success: false, data: null } as any;
   }
-
-  // refresh 시도 (BFF에 없으면 404/널이어도 무시)
-  const r = await raw("/api/v1/auth/refresh", { method: "POST" });
-  if (r.res.ok && r.json?.success) {
-    const again = await raw(path, init);
-    return (again.json as StandardResponseLegacy<T>) ?? ({ success: again.res.ok, data: null } as any);
-  }
-
-  return (first.json as StandardResponseLegacy<T>) ?? ({ success: false, data: null } as any);
 }
 
 // ================= Auth =================
@@ -203,29 +229,53 @@ export async function me() {
 }
 
 export async function logout() {
-  return apiFetch("/api/v1/auth/logout", { method: "POST" });
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    credentials: 'include',
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
 }
 
 // ================= User =================
-// (이건 BFF에 없으면 4100 서버로 보낼 수 있도록 .env로 API_BASE를 세팅해서 사용)
 export async function updateProfile(nickname: string | null) {
-  return apiFetch<{ user: { id: string; phone_e164_norm: string; nickname: string | null } }>(
-    "/api/v1/user/profile",
-    { method: "POST", body: JSON.stringify({ nickname }) },
-  );
+  // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const res = await fetch(`${API_BASE}/user/profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: 'include',
+    body: JSON.stringify({ nickname }),
+  });
+  
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  
+  const json = await res.json();
+  return json;
 }
 
-// 기존 api 함수 (하위 호환성 유지)
+// ================= 하위 호환성 함수들 (점진적 제거 예정) =================
+// ⚠️ 새로운 코드에서는 사용하지 말고 위의 직접 호출 함수들을 사용하세요
+
 export async function apiLegacy(path: string, init?: RequestInit) {
-  const res = await fetch(`/api${path}`, {
+  console.warn('[DEPRECATED] apiLegacy is deprecated. Use direct backend calls instead.');
+  
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
   });
   if (res.status === 401) {
-    const r = await fetch(`/api/v1/auth/refresh`, { method: "POST", credentials: "include" });
+    const r = await fetch(`${API_BASE}/auth/refresh`, { method: "POST", credentials: "include" });
     if (r.ok) {
-      const retry = await fetch(`/api${path}`, {
+      const retry = await fetch(`${API_BASE}${path}`, {
         credentials: "include",
         headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
         ...init,

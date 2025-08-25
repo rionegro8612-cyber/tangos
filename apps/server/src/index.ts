@@ -194,7 +194,10 @@ app.get("/api/v1/_health", (_req, res) => {
 
 // ▼ API 라우터 마운트 (가장 중요!)
 const API_BASE = process.env.API_BASE || "/api/v1";
-app.use(API_BASE, router);
+// 1) 임시로 apiRouter를 끄고,
+// app.use(API_BASE, router);
+// 2) routes의 기본 라우터로 교체 (compat 프록시 포함)
+app.use(API_BASE, apiRouter);
 
 // ▼ 에러 핸들러
 app.use(standardErrorHandler);

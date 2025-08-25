@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { api, sendSms as apiSendSms, verifyCode as apiVerifyCode, me as apiMe, logout as apiLogout, API_BASE } from '@/lib/api';
 
 export type User = {
   id: number;
@@ -23,18 +24,6 @@ export type AuthState = {
   setUser: (u: User | null) => void;
   bootstrap: () => Promise<void>;
   logout: () => Promise<void>;
-};
-
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  'http://localhost:4100'
-).replace(/\/+$/, '');
-
-const safeJson = async (res: Response) => {
-  const text = await res.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return null; }
 };
 
 const extractUser = (j: any): User | null => {
@@ -70,39 +59,32 @@ export const useAuthStore = create<AuthState>((set: (state: Partial<AuthState>) 
   // 앱 시작 시 1회 실행: me → (401) refresh → me 재시도
   bootstrap: async () => {
     try {
-      const me = await fetch(`${API_BASE}/api/v1/auth/me`, { credentials: 'include' });
-      if (me.ok) {
-        const j = await safeJson(me);
-        set({ user: extractUser(j), ready: true });
-        return;
-      }
-
-      if (me.status === 401) {
-        const r = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (r.ok) {
-          const me2 = await fetch(`${API_BASE}/api/v1/auth/me`, { credentials: 'include' });
-          const j2 = await safeJson(me2);
-          set({ user: extractUser(j2), ready: true });
+      const response = await apiMe();
+      set({ user: extractUser(response), ready: true });
+    } catch (error: any) {
+      if (error.status === 401) {
+        try {
+          // refresh 시도 (백엔드 직접 호출)
+          await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include'
+          });
+          const me2 = await apiMe();
+          set({ user: extractUser(me2), ready: true });
           return;
+        } catch {
+          // refresh 실패 시 로그아웃 상태
+          set({ user: null, ready: true });
         }
+      } else {
+        set({ user: null, ready: true });
       }
-
-      set({ user: null, ready: true });
-    } catch {
-      set({ user: null, ready: true });
     }
   },
 
   logout: async () => {
     try {
-      await fetch(`${API_BASE}/api/v1/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      await apiLogout();
     } finally {
       set({ user: null });
     }
@@ -111,4 +93,17 @@ export const useAuthStore = create<AuthState>((set: (state: Partial<AuthState>) 
 
 // 기존 alias 호환
 export const useAuth = useAuthStore;
+
+// 인증 관련 API 함수들 - 백엔드 직접 호출로 통일
+export async function sendSms(phone: string) {
+  return apiSendSms(phone);
+}
+
+export async function verifyCode(args: { phone: string; code: string; requestId: string }) {
+  return apiVerifyCode(args.phone, args.code);
+}
+
+export async function me() {
+  return apiMe();
+}
 

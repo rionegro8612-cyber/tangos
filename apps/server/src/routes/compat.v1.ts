@@ -48,7 +48,18 @@ router.post("/auth/register/start", (req, res, next) => {
   console.warn(`[DEPRECATED] /api/v1/auth/register/start called from ${req.ip}`);
   
   // 임시로 성공 응답 (기존 로직과 연동 필요)
-  res.ok({ message: "Registration started" });
+  return res.json({
+    success: true,
+    code: "OK",
+    message: "REG_START_OK (Deprecated)",
+    data: {
+      started: true,
+      phone: req.body.phone,
+      carrier: req.body.carrier,
+      ttlSec: 1800
+    },
+    requestId: (req as any).requestId ?? null,
+  });
 });
 
 router.post("/auth/register/complete", (req, res, next) => {
@@ -56,7 +67,16 @@ router.post("/auth/register/complete", (req, res, next) => {
   console.warn(`[DEPRECATED] /api/v1/auth/register/complete called from ${req.ip}`);
   
   // 임시로 성공 응답 (기존 로직과 연동 필요)
-  res.ok({ message: "Registration completed" });
+  return res.json({
+    success: true,
+    code: "OK",
+    message: "REG_COMPLETE_OK (Deprecated)",
+    data: {
+      registered: true,
+      message: "Registration completed (Deprecated)"
+    },
+    requestId: (req as any).requestId ?? null,
+  });
 });
 
 export default router;
