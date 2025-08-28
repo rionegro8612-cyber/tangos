@@ -3,7 +3,7 @@
  * 외부 연동을 위한 HTTP 클라이언트 (타임아웃, 리트라이, 표준화)
  */
 
-import { StandardError, createError } from './errorCodes';
+import { StandardError, createError } from "./errorCodes";
 
 export interface HttpClientConfig {
   baseURL?: string;
@@ -14,7 +14,7 @@ export interface HttpClientConfig {
 }
 
 export interface RequestConfig extends HttpClientConfig {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: any;
   signal?: AbortSignal;
 }
@@ -32,7 +32,7 @@ export interface StandardResponse<T = any> {
  */
 function wrapExternalResponse<T>(response: any, serviceName: string): StandardResponse<T> {
   // 이미 StandardResponse 형태인 경우
-  if (response && typeof response === 'object' && 'success' in response) {
+  if (response && typeof response === "object" && "success" in response) {
     return response as StandardResponse<T>;
   }
 
@@ -40,7 +40,7 @@ function wrapExternalResponse<T>(response: any, serviceName: string): StandardRe
   return {
     success: true,
     data: response,
-    message: `${serviceName} API response`
+    message: `${serviceName} API response`,
   };
 }
 
@@ -49,7 +49,7 @@ function wrapExternalResponse<T>(response: any, serviceName: string): StandardRe
  */
 function isRetryableError(error: any): boolean {
   // 네트워크 에러
-  if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+  if (error.code === "ECONNRESET" || error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
     return true;
   }
 
@@ -71,7 +71,7 @@ function isRetryableError(error: any): boolean {
  * 지연 함수
  */
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -86,10 +86,10 @@ export class HttpClient {
       retries: 2,
       retryDelay: 1000,
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'TangoApp/1.0',
+        "Content-Type": "application/json",
+        "User-Agent": "TangoApp/1.0",
       },
-      ...config
+      ...config,
     };
   }
 
@@ -126,14 +126,11 @@ export class HttpClient {
   /**
    * 실제 HTTP 요청 수행
    */
-  private async performRequest<T>(url: string, config: RequestConfig): Promise<StandardResponse<T>> {
-    const {
-      method = 'GET',
-      body,
-      timeout = 3000,
-      headers = {},
-      signal
-    } = config;
+  private async performRequest<T>(
+    url: string,
+    config: RequestConfig,
+  ): Promise<StandardResponse<T>> {
+    const { method = "GET", body, timeout = 3000, headers = {}, signal } = config;
 
     // AbortController로 타임아웃 처리
     const controller = new AbortController();
@@ -141,7 +138,7 @@ export class HttpClient {
 
     // 사용자가 제공한 signal과 타임아웃 signal 조합
     if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
+      signal.addEventListener("abort", () => controller.abort());
     }
 
     try {
@@ -149,13 +146,13 @@ export class HttpClient {
         method,
         headers: {
           ...this.config.headers,
-          ...headers
+          ...headers,
         },
-        signal: controller.signal
+        signal: controller.signal,
       };
 
-      if (body && method !== 'GET') {
-        fetchConfig.body = typeof body === 'string' ? body : JSON.stringify(body);
+      if (body && method !== "GET") {
+        fetchConfig.body = typeof body === "string" ? body : JSON.stringify(body);
       }
 
       const response = await fetch(url, fetchConfig);
@@ -171,14 +168,11 @@ export class HttpClient {
           errorData = { message: errorText };
         }
 
-        throw createError.externalApiError(
-          this.getServiceNameFromUrl(url),
-          {
-            status: response.status,
-            statusText: response.statusText,
-            data: errorData
-          }
-        );
+        throw createError.externalApiError(this.getServiceNameFromUrl(url), {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData,
+        });
       }
 
       // 응답 파싱
@@ -191,13 +185,12 @@ export class HttpClient {
       }
 
       return wrapExternalResponse<T>(responseData, this.getServiceNameFromUrl(url));
-
     } catch (error) {
       clearTimeout(timeoutId);
 
       // AbortError (타임아웃)
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new StandardError('KYC_API_TIMEOUT', `Request timeout (${timeout}ms): ${url}`);
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new StandardError("KYC_API_TIMEOUT", `Request timeout (${timeout}ms): ${url}`);
       }
 
       // StandardError는 그대로 전파
@@ -206,13 +199,10 @@ export class HttpClient {
       }
 
       // 기타 네트워크 에러
-      throw createError.externalApiError(
-        this.getServiceNameFromUrl(url),
-        {
-          message: error instanceof Error ? error.message : 'Unknown network error',
-          code: (error as any)?.code
-        }
-      );
+      throw createError.externalApiError(this.getServiceNameFromUrl(url), {
+        message: error instanceof Error ? error.message : "Unknown network error",
+        code: (error as any)?.code,
+      });
     }
   }
 
@@ -224,36 +214,50 @@ export class HttpClient {
       const urlObj = new URL(url);
       return urlObj.hostname;
     } catch {
-      return 'External API';
+      return "External API";
     }
   }
 
   /**
    * GET 요청
    */
-  async get<T>(url: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<StandardResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'GET' });
+  async get<T>(
+    url: string,
+    config?: Omit<RequestConfig, "method" | "body">,
+  ): Promise<StandardResponse<T>> {
+    return this.request<T>(url, { ...config, method: "GET" });
   }
 
   /**
    * POST 요청
    */
-  async post<T>(url: string, body?: any, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<StandardResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'POST', body });
+  async post<T>(
+    url: string,
+    body?: any,
+    config?: Omit<RequestConfig, "method" | "body">,
+  ): Promise<StandardResponse<T>> {
+    return this.request<T>(url, { ...config, method: "POST", body });
   }
 
   /**
    * PUT 요청
    */
-  async put<T>(url: string, body?: any, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<StandardResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'PUT', body });
+  async put<T>(
+    url: string,
+    body?: any,
+    config?: Omit<RequestConfig, "method" | "body">,
+  ): Promise<StandardResponse<T>> {
+    return this.request<T>(url, { ...config, method: "PUT", body });
   }
 
   /**
    * DELETE 요청
    */
-  async delete<T>(url: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<StandardResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'DELETE' });
+  async delete<T>(
+    url: string,
+    config?: Omit<RequestConfig, "method" | "body">,
+  ): Promise<StandardResponse<T>> {
+    return this.request<T>(url, { ...config, method: "DELETE" });
   }
 }
 
@@ -267,17 +271,17 @@ export const httpClient = new HttpClient();
 // 지도 API용 클라이언트 (5초 타임아웃)
 export const mapClient = new HttpClient({
   timeout: 5000,
-  retries: 1
+  retries: 1,
 });
 
 // KYC API용 클라이언트 (10초 타임아웃, 재시도 없음)
 export const kycClient = new HttpClient({
   timeout: 10000,
-  retries: 0
+  retries: 0,
 });
 
 // SMS API용 클라이언트 (5초 타임아웃)
 export const smsClient = new HttpClient({
   timeout: 5000,
-  retries: 1
+  retries: 1,
 });

@@ -19,16 +19,16 @@ datasources:
         datasourceUid: loki
       tracesToLogs:
         datasourceUid: loki
-        tags: ['job', 'instance', 'pod', 'namespace']
-        mappedTags: [{ key: 'service.name', value: 'service' }]
+        tags: ["job", "instance", "pod", "namespace"]
+        mappedTags: [{ key: "service.name", value: "service" }]
         mapTagNamesEnabled: false
-        spanStartTimeShift: '1h'
-        spanEndTimeShift: '-1h'
+        spanStartTimeShift: "1h"
+        spanEndTimeShift: "-1h"
         filterByTraceID: false
         filterBySpanID: false
       tracesToMetrics:
         datasourceUid: prometheus
-        tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+        tags: [{ key: "service.name", value: "service" }, { key: "job" }]
         queries:
-          - name: 'Sample query'
-            query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))'
+          - name: "Sample query"
+            query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"

@@ -17,4 +17,3 @@
   "include": ["src/**/*"],
   "exclude": ["src/routes/_legacy/**", "node_modules", "dist"]
 }
-

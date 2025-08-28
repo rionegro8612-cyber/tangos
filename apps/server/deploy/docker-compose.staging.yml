@@ -1,0 +1,190 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4100:4100"
+    env_file:
+      - ./.env
+    environment:
+      - NODE_ENV=development
+      - PORT=4100
+      - DATABASE_URL=postgres://tango:tango123@postgres:5432/tango_staging
+      - REDIS_URL=redis://redis:6379
+      - PHONE_ENC_KEY=${PHONE_ENC_KEY:-dev-32-bytes-minimum-secret-key}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks:
+      - tango-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:4100/api/v1/_ping || curl -fsS http://localhost:4100/api/v1/_ping || exit 1",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+  # ===== 데이터베이스 =====
+  postgres:
+    image: postgres:15-alpine
+    container_name: tango-postgres
+    environment:
+      POSTGRES_DB: tango
+      POSTGRES_USER: tango
+      POSTGRES_PASSWORD: tango123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tango-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tango -d tango"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===== Redis =====
+  redis:
+    image: redis:7-alpine
+    container_name: tango-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - tango-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===== Grafana Loki (로그 집계) =====
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: tango-loki
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki.yaml
+      - loki-data:/loki
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+  # ===== Promtail (로그 수집) =====
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: tango-promtail
+    command: ["-config.file=/etc/promtail.yaml"]
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail.yaml
+      - ./logs:/var/log/apps
+      - /var/log:/var/log
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+  # ===== Grafana (로깅 + 메트릭 대시보드) =====
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: tango-grafana
+    ports:
+      - "3030:3030"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana-tempo-datasource.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
+    networks:
+      - tango-logging
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+      - alertmanager
+    restart: unless-stopped
+
+  # ===== Grafana Tempo (분산 트레이싱) =====
+  tempo:
+    image: grafana/tempo:2.3.0
+    container_name: tango-tempo
+    ports:
+      - "3200:3200" # HTTP
+      - "4318:4318" # OTLP HTTP
+      - "4317:4317" # OTLP gRPC
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+  # ===== Prometheus (메트릭 수집) =====
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: tango-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - tango-logging
+    depends_on:
+      - alertmanager
+    restart: unless-stopped
+
+  # ===== Alertmanager (알림 관리) 🆕 추가 =====
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: tango-alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.console.libraries=/etc/alertmanager/console_libraries"
+      - "--web.console.templates=/etc/alertmanager/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/alertmanager
+    networks:
+      - tango-logging
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  loki-data:
+  grafana-storage:
+  tempo-data:
+  prometheus-data:
+  alertmanager-data: # 🆕 추가
+
+networks:
+  tango-network:
+    driver: bridge
+  tango-logging:
+    driver: bridge

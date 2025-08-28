@@ -13,7 +13,12 @@ export function responseMiddleware(req: Request, res: Response, next: NextFuncti
     });
   };
 
-  (res as any).fail = function (status: number, code: string, message: string | null = null, data: any = null) {
+  (res as any).fail = function (
+    status: number,
+    code: string,
+    message: string | null = null,
+    data: any = null,
+  ) {
     return res.status(status).json({
       success: false,
       code,

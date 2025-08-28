@@ -2,7 +2,7 @@ groups:
   - name: tango-server-alerts
     rules:
       # ===== 5xx 에러율 알림 =====
-      
+
       # 5분 이동창 5xx 비율 > 1% → 경고
       - alert: HighErrorRate
         expr: |
@@ -17,7 +17,7 @@ groups:
           summary: "높은 에러율 감지"
           description: "5분 이동창 5xx 에러율이 1%를 초과했습니다. 현재: {{ $value | humanizePercentage }}"
           dashboard: "{{ $labels.instance }}/d/tango-server/api-performance"
-          
+
       # 5분 이동창 5xx 비율 > 3% → 심각
       - alert: CriticalErrorRate
         expr: |
@@ -32,9 +32,9 @@ groups:
           summary: "심각한 에러율 감지"
           description: "5분 이동창 5xx 에러율이 3%를 초과했습니다. 현재: {{ $value | humanizePercentage }}"
           dashboard: "{{ $labels.instance }}/d/tango-server/api-performance"
-          
+
       # ===== 레이트리밋 과도 사용 알림 =====
-      
+
       # /auth/send-sms 429 급증 → 레이트리밋 과도/봇 의심
       - alert: HighRateLimitExceeded
         expr: |
@@ -48,7 +48,7 @@ groups:
           summary: "레이트리밋 과도 사용 감지"
           description: "OTP 전송 레이트리밋이 과도하게 초과되고 있습니다. 5분당 {{ $value }}회 초과"
           dashboard: "{{ $labels.instance }}/d/tango-server/rate-limit-monitoring"
-          
+
       # IP 기반 레이트리밋 과도 사용
       - alert: HighIPRateLimitExceeded
         expr: |
@@ -62,9 +62,9 @@ groups:
           summary: "IP 기반 레이트리밋 과도 사용"
           description: "특정 IP에서 OTP 전송 레이트리밋을 과도하게 초과하고 있습니다. 5분당 {{ $value }}회 초과"
           dashboard: "{{ $labels.instance }}/d/tango-server/rate-limit-monitoring"
-          
+
       # ===== OTP 품질 문제 알림 =====
-      
+
       # INVALID_CODE 비율이 발송 대비 >20% 지속 → 전달 품질 문제
       - alert: HighOTPInvalidCodeRate
         expr: |
@@ -82,7 +82,7 @@ groups:
           summary: "OTP 품질 문제 감지"
           description: "INVALID_CODE 비율이 발송 대비 20%를 초과하고 있습니다. 현재: {{ $value | humanizePercentage }}"
           dashboard: "{{ $labels.instance }}/d/tango-server/otp-monitoring"
-          
+
       # OTP 만료율 과도
       - alert: HighOTPExpiredRate
         expr: |
@@ -100,9 +100,9 @@ groups:
           summary: "OTP 만료율 과도"
           description: "OTP 만료율이 15%를 초과하고 있습니다. 현재: {{ $value | humanizePercentage }}"
           dashboard: "{{ $labels.instance }}/d/tango-server/otp-monitoring"
-          
+
       # ===== 성능 지연시간 알림 =====
-      
+
       # p95 latency가 >1s 5분 이상 → 성능 경보
       - alert: HighLatencyP95
         expr: |
@@ -118,7 +118,7 @@ groups:
           summary: "높은 지연시간 감지"
           description: "p95 지연시간이 1초를 초과하고 있습니다. 현재: {{ $value }}ms"
           dashboard: "{{ $labels.instance }}/d/tango-server/api-performance"
-          
+
       # p99 latency가 >2s 3분 이상 → 심각한 성능 문제
       - alert: CriticalLatencyP99
         expr: |
@@ -134,9 +134,9 @@ groups:
           summary: "심각한 지연시간 감지"
           description: "p99 지연시간이 2초를 초과하고 있습니다. 현재: {{ $value }}ms"
           dashboard: "{{ $labels.instance }}/d/tango-server/api-performance"
-          
+
       # ===== 시스템 리소스 알림 =====
-      
+
       # 높은 CPU 사용률
       - alert: HighCPUUsage
         expr: |
@@ -150,7 +150,7 @@ groups:
           summary: "높은 CPU 사용률"
           description: "CPU 사용률이 80%를 초과하고 있습니다. 현재: {{ $value }}%"
           dashboard: "{{ $labels.instance }}/d/tango-server/system-metrics"
-          
+
       # 높은 메모리 사용률
       - alert: HighMemoryUsage
         expr: |
@@ -164,9 +164,9 @@ groups:
           summary: "높은 메모리 사용률"
           description: "메모리 사용률이 85%를 초과하고 있습니다. 현재: {{ $value }}%"
           dashboard: "{{ $labels.instance }}/d/tango-server/system-metrics"
-          
+
       # ===== 비즈니스 메트릭 알림 =====
-      
+
       # OTP 전송 실패율 과도
       - alert: HighOTPSendFailureRate
         expr: |
@@ -184,7 +184,7 @@ groups:
           summary: "OTP 전송 실패율 과도"
           description: "OTP 전송 실패율이 10%를 초과하고 있습니다. 현재: {{ $value | humanizePercentage }}"
           dashboard: "{{ $labels.instance }}/d/tango-server/otp-monitoring"
-          
+
       # 사용자 등록 실패율 과도
       - alert: HighUserRegistrationFailureRate
         expr: |

@@ -45,7 +45,7 @@ export function responseMiddleware(req: Request, res: Response, next: NextFuncti
 /** 일관 에러 핸들러 */
 export function standardErrorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
   const status = Number(err?.status || 500);
-  const code = status >= 500 ? "INTERNAL_ERROR" : (err?.code || "ERROR");
+  const code = status >= 500 ? "INTERNAL_ERROR" : err?.code || "ERROR";
   const message = err?.message || "server error";
 
   res.status(status).json({

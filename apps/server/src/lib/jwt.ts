@@ -4,13 +4,13 @@ import crypto from "crypto";
 
 /** 환경설정 */
 const SECRET = process.env.JWT_SECRET || "dev_only_change_me";
-const ACCESS_MIN = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30);     // 30분
+const ACCESS_MIN = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30); // 30분
 const REFRESH_DAYS = Number(process.env.JWT_REFRESH_EXPIRES_DAYS || 30); // 30일
 
 /** JWT Payload 타입 */
 export interface JwtPayload {
-  uid: string;   // user id (UUID)
-  jti: string;   // unique token id
+  uid: string; // user id (UUID)
+  jti: string; // unique token id
   iat?: number;
   exp?: number;
   iss?: string;

@@ -7,7 +7,7 @@ Express + TypeScript 기반 백엔드 서버
 표준 엔드포인트 (외부 계약 고정):
 
 - `POST /api/v1/auth/send-sms` - SMS 전송
-- `POST /api/v1/auth/resend-sms` - SMS 재전송  
+- `POST /api/v1/auth/resend-sms` - SMS 재전송
 - `POST /api/v1/auth/verify-code` - OTP 검증 → `{ isNew: boolean }`
 - `POST /api/v1/auth/signup` - 최종 1회 제출(약관 동의 시점)
 
@@ -15,7 +15,7 @@ Express + TypeScript 기반 백엔드 서버
 
 - **TTL**: 300초 (5분)
 - **재전송 쿨다운**: 60초 (1분)
-- **레이트 리밋**: 
+- **레이트 리밋**:
   - 전화번호별: 1일 5회
   - IP별: 1일 10회
   - 재전송: 1분 3회
@@ -69,16 +69,19 @@ OTP_LOCK_MINUTES=10
 ## 실행
 
 ### 개발 모드
+
 ```bash
 npm run dev
 ```
 
 ### 빌드
+
 ```bash
 npm run build
 ```
 
 ### 프로덕션 실행
+
 ```bash
 npm start
 ```
@@ -86,10 +89,12 @@ npm start
 ## API 엔드포인트
 
 ### 인증
+
 - `POST /api/v1/auth/send-sms` - SMS 인증번호 발송
 - `POST /api/v1/auth/verify-code` - SMS 인증번호 검증
 
 ### 헬스체크
+
 - `GET /health` - 서버 상태 확인
 
 ## 프로젝트 구조
@@ -107,6 +112,3 @@ src/
 ├── otpStore.ts          # OTP 저장소
 └── index.ts             # 서버 진입점
 ```
-
-
-

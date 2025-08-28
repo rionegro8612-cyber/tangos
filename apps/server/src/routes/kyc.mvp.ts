@@ -29,7 +29,12 @@ function calcAge(birthYmd: string): number | null {
 router.post("/kyc/pass", async (req, res) => {
   const rid = (req as any).id;
   try {
-    const { name = "", birth = "", phone = "", carrier = "" } = (req.body || {}) as Record<string, string>;
+    const {
+      name = "",
+      birth = "",
+      phone = "",
+      carrier = "",
+    } = (req.body || {}) as Record<string, string>;
 
     // 기본 파라미터 체크
     if (!name || !birth || !phone || !carrier) {
@@ -104,8 +109,7 @@ router.post("/kyc/pass", async (req, res) => {
     // DB 업데이트
     // - 스키마가 프로젝트마다 다를 수 있어 넓게 호환:
     //   is_kyc_verified / kyc_verified_at 를 쓰는 경우 + kyc_provider 기록
-    const sql =
-      `UPDATE users
+    const sql = `UPDATE users
          SET is_kyc_verified = TRUE,
              kyc_verified_at = NOW(),
              kyc_provider = $2

@@ -11,18 +11,21 @@ router.post("/kyc/pass", async (req, res) => {
     return res.fail("INVALID_ARG", "name, birth, phone, carrier required", 400);
   }
   try {
-    let verified = false, providerTraceId = "";
+    let verified = false,
+      providerTraceId = "";
     try {
       const r1 = await verifyPASS({ name, birth, phone, carrier });
-      verified = r1.verified; providerTraceId = (r1 as any).providerTraceId;
+      verified = r1.verified;
+      providerTraceId = (r1 as any).providerTraceId;
     } catch {
       const r2 = await verifyNICE({ name, birth, phone, carrier });
-      verified = r2.verified; providerTraceId = (r2 as any).providerTraceId;
+      verified = r2.verified;
+      providerTraceId = (r2 as any).providerTraceId;
     }
     if (!verified) return res.fail("KYC_FAILED", "KYC verification failed", 403);
     // TODO: update users table with kyc flags
     return res.ok({ kyc: "verified", providerTraceId });
-  } catch (e:any) {
+  } catch (e: any) {
     return res.fail("KYC_PROVIDER_ERROR", e.message || "KYC error", 502);
   }
 });

@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy CI (No Deploy)
 
 on:
   push:
@@ -6,133 +6,44 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
-  test:
+  ci:
+    name: "배포 전 CI 검증"
     runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
         
-      - name: Run tests
-        run: npm test
-        
-      - name: Run linting
-        run: npm run lint
-        
-      - name: Run type check
-        run: npm run type-check
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: npm ci
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-            
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Deploy to production
-        run: |
-          echo "Deploying version ${{ github.ref_name }} to production"
-          # 실제 배포 스크립트 실행
-          
-      - name: Wait for deployment
-        run: |
-          echo "Waiting for deployment to stabilize..."
-          sleep 30
-          
-      - name: Run database migrations
-        run: |
-          echo "Running database migrations..."
-          # 마이그레이션 실행
-          # DATABASE_URL=${{ secrets.DATABASE_URL }} npm run migrate
-          
-      - name: Health check
-        run: |
-          echo "Performing health checks..."
-          # 헬스체크 수행
-          # curl -f http://production-url/readyz || exit 1
-          
-      - name: Check error rate
-        run: |
-          echo "Checking error rate..."
-          # 에러율 체크 (5% 임계치)
-          # ERROR_RATE=$(curl -s http://production-url/health/rollback | jq -r '.shouldRollback')
-          # if [ "$ERROR_RATE" = "true" ]; then
-          #   echo "Error rate too high, triggering rollback"
-          #   exit 1
-          # fi
-          
-      - name: Rollback on failure
-        if: failure()
-        run: |
-          echo "Deployment failed, rolling back..."
-          # 롤백 스크립트 실행
-          # git checkout ${{ github.event.before }}
-          # ./rollback.sh
-
-  rollback:
-    needs: deploy
-    if: failure()
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Automatic rollback
-        run: |
-          echo "Automatic rollback triggered"
-          # 자동 롤백 로직
-          # 1. 이전 버전으로 복원
-          # 2. 데이터베이스 롤백 (필요시)
-          # 3. 헬스체크 확인
-          
-      - name: Notify rollback
-        run: |
-          echo "Rollback completed, notifying team"
-          # 팀 알림 (Slack, Email 등)
+    - name: Type check
+      run: npm run ci:typecheck
+      
+    - name: Lint
+      run: npm run ci:lint
+      
+    - name: Test
+      run: npm run ci:test
+      
+    - name: Build
+      run: npm run ci:build
+      
+    - name: Format check
+      run: npm run ci:format:check
+      
+    - name: CI Complete
+      run: |
+        echo "✅ CI 검증 완료 - 배포는 보류 상태"
+        echo "📝 실제 배포는 별도 수동 프로세스로 진행"

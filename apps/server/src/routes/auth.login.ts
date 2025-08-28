@@ -17,7 +17,7 @@ loginRouter.post("/send-sms", async (req, res) => {
 
   const e164 = normalizeE164(phone);
   let user = await findByPhone(e164);
-  
+
   // 테스트용: 사용자가 없으면 자동 생성 (실제 운영에서는 제거)
   if (!user) {
     console.log(`[DEV] 사용자 자동 생성: ${e164}`);
@@ -29,16 +29,16 @@ loginRouter.post("/send-sms", async (req, res) => {
 
   const code = otp.generateCode();
   otp.putCode(e164, code, "login");
-  
+
   // send via SMS vendor (mock in dev by default)
   if (process.env.NODE_ENV !== "test") {
     // SMS 전송 로직 (현재는 콘솔 출력)
     console.log(`[DEV] SMS to ${e164}: [Tango] 인증번호: ${code}`);
   }
-  
+
   // 🆕 메트릭: OTP 전송 성공
-  recordOtpSend('success', 'MOCK', 'unknown');
-  
+  recordOtpSend("success", "MOCK", "unknown");
+
   const devCode = process.env.NODE_ENV !== "production" ? code : undefined;
   return res.ok({ issued: true, ttlSec: 300, ...(devCode ? { devCode } : {}) }, "OK");
 });
@@ -52,21 +52,21 @@ loginRouter.post("/verify-login", async (req, res) => {
   const ok = otp.verifyCode(e164, code, "login");
   if (!ok) {
     // 🆕 메트릭: OTP 검증 실패
-    recordOtpVerify('fail', 'INVALID_CODE');
+    recordOtpVerify("fail", "INVALID_CODE");
     return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
   }
-  
+
   // 🆕 메트릭: OTP 검증 성공
-  recordOtpVerify('success', 'VALID_CODE');
+  recordOtpVerify("success", "VALID_CODE");
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
 
   const jti = newJti();
-  const at  = signAccessToken(String(user.id), jti);
-  const rt  = signRefreshToken(String(user.id), jti);
+  const at = signAccessToken(String(user.id), jti);
+  const rt = signRefreshToken(String(user.id), jti);
   // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-  console.log('[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):', { jti, userId: String(user.id) });
+  console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
   // TODO: refresh_tokens 테이블 생성 후 활성화
   // await saveNewRefreshToken({
   //   jti, userId: String(user.id), token: rt,
@@ -75,10 +75,10 @@ loginRouter.post("/verify-login", async (req, res) => {
   //   ip: req.ip ?? undefined,
   // });
   setAuthCookies(res, at, rt);
-  
+
   // 🆕 메트릭: 사용자 로그인 성공
-  recordUserLogin('success', 'LOGIN_OK');
-  
+  recordUserLogin("success", "LOGIN_OK");
+
   return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
@@ -91,21 +91,21 @@ loginRouter.post("/verify-code", async (req, res) => {
   const ok = otp.verifyCode(e164, code, "login");
   if (!ok) {
     // 🆕 메트릭: OTP 검증 실패
-    recordOtpVerify('fail', 'INVALID_CODE');
+    recordOtpVerify("fail", "INVALID_CODE");
     return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
   }
-  
+
   // 🆕 메트릭: OTP 검증 성공
-  recordOtpVerify('success', 'VALID_CODE');
+  recordOtpVerify("success", "VALID_CODE");
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
 
   const jti = newJti();
-  const at  = signAccessToken(String(user.id), jti);
-  const rt  = signRefreshToken(String(user.id), jti);
+  const at = signAccessToken(String(user.id), jti);
+  const rt = signRefreshToken(String(user.id), jti);
   // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-  console.log('[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):', { jti, userId: String(user.id) });
+  console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
   // TODO: refresh_tokens 테이블 생성 후 활성화
   // await saveNewRefreshToken({
   //   jti, userId: String(user.id), token: rt,
@@ -114,24 +114,27 @@ loginRouter.post("/verify-code", async (req, res) => {
   //   ip: req.ip ?? undefined,
   // });
   setAuthCookies(res, at, rt);
-  
+
   // 🆕 메트릭: 사용자 로그인 성공
-  recordUserLogin('success', 'LOGIN_OK');
-  
+  recordUserLogin("success", "LOGIN_OK");
+
   return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 
 // 세션 확인
 loginRouter.get("/me", authJwt, async (req, res) => {
   if (!req.user?.id) return res.fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
-  
+
   // id로 사용자 조회 (id는 number 타입)
   const user = await getUserProfile(req.user.id);
   if (!user) return res.fail("USER_NOT_FOUND", "사용자를 찾을 수 없습니다.", 404);
-  
-  return res.ok({ 
-    id: user.id, 
-    phone: user.phone, 
-    nickname: user.nickname 
-  }, "OK");
+
+  return res.ok(
+    {
+      id: user.id,
+      phone: user.phone,
+      nickname: user.nickname,
+    },
+    "OK",
+  );
 });

@@ -45,13 +45,16 @@ if (process.env.DATABASE_URL) {
 /**
  * 데이터베이스 쿼리 실행 함수
  */
-export async function query<T = any>(text: string, params?: any[]): Promise<{ rows: T[]; rowCount: number }> {
+export async function query<T = any>(
+  text: string,
+  params?: any[],
+): Promise<{ rows: T[]; rowCount: number }> {
   const client = await pool.connect();
   try {
     const result = await client.query(text, params);
     return {
       rows: result.rows,
-      rowCount: result.rowCount || 0
+      rowCount: result.rowCount || 0,
     };
   } finally {
     client.release();
@@ -59,4 +62,3 @@ export async function query<T = any>(text: string, params?: any[]): Promise<{ ro
 }
 
 export { pool };
-

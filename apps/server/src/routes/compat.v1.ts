@@ -11,10 +11,12 @@ router.post("/auth/verify-login", (req, res, next) => {
   // Deprecation 헤더 설정
   res.setHeader("Deprecation", "true");
   res.setHeader("Sunset", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()); // 2주 후
-  
+
   // 로그 기록
-  console.warn(`[DEPRECATED] /api/v1/auth/verify-login called from ${req.ip}, redirecting to /verify-code`);
-  
+  console.warn(
+    `[DEPRECATED] /api/v1/auth/verify-login called from ${req.ip}, redirecting to /verify-code`,
+  );
+
   // 새 엔드포인트로 요청 전달
   req.url = "/auth/verify-code";
   next();
@@ -24,9 +26,11 @@ router.post("/auth/verify-login", (req, res, next) => {
 router.post("/auth/register/verify", (req, res, next) => {
   res.setHeader("Deprecation", "true");
   res.setHeader("Sunset", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString());
-  
-  console.warn(`[DEPRECATED] /api/v1/auth/register/verify called from ${req.ip}, redirecting to /verify-code`);
-  
+
+  console.warn(
+    `[DEPRECATED] /api/v1/auth/register/verify called from ${req.ip}, redirecting to /verify-code`,
+  );
+
   req.url = "/auth/verify-code";
   next();
 });
@@ -35,9 +39,11 @@ router.post("/auth/register/verify", (req, res, next) => {
 router.post("/auth/send-sms", (req, res, next) => {
   res.setHeader("Deprecation", "true");
   res.setHeader("Sunset", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString());
-  
-  console.warn(`[DEPRECATED] /api/v1/auth/send-sms called from ${req.ip}, redirecting to /send-sms`);
-  
+
+  console.warn(
+    `[DEPRECATED] /api/v1/auth/send-sms called from ${req.ip}, redirecting to /send-sms`,
+  );
+
   req.url = "/auth/send-sms";
   next();
 });
@@ -46,7 +52,7 @@ router.post("/auth/send-sms", (req, res, next) => {
 router.post("/auth/register/start", (req, res, next) => {
   res.setHeader("Deprecation", "true");
   console.warn(`[DEPRECATED] /api/v1/auth/register/start called from ${req.ip}`);
-  
+
   // 임시로 성공 응답 (기존 로직과 연동 필요)
   return res.json({
     success: true,
@@ -56,7 +62,7 @@ router.post("/auth/register/start", (req, res, next) => {
       started: true,
       phone: req.body.phone,
       carrier: req.body.carrier,
-      ttlSec: 1800
+      ttlSec: 1800,
     },
     requestId: (req as any).requestId ?? null,
   });
@@ -65,7 +71,7 @@ router.post("/auth/register/start", (req, res, next) => {
 router.post("/auth/register/complete", (req, res, next) => {
   res.setHeader("Deprecation", "true");
   console.warn(`[DEPRECATED] /api/v1/auth/register/complete called from ${req.ip}`);
-  
+
   // 임시로 성공 응답 (기존 로직과 연동 필요)
   return res.json({
     success: true,
@@ -73,7 +79,7 @@ router.post("/auth/register/complete", (req, res, next) => {
     message: "REG_COMPLETE_OK (Deprecated)",
     data: {
       registered: true,
-      message: "Registration completed (Deprecated)"
+      message: "Registration completed (Deprecated)",
     },
     requestId: (req as any).requestId ?? null,
   });

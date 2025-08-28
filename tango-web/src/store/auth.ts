@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { api, sendSms as apiSendSms, verifyCode as apiVerifyCode, me as apiMe, logout as apiLogout, API_BASE } from '@/lib/api';
+import { sendSms as apiSendSms, verifyCode as apiVerifyCode, me as apiMe, logout as apiLogout, API_BASE } from '@/lib/api';
 
 export type User = {
   id: number;

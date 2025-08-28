@@ -25,16 +25,10 @@ router.use("/auth/register", registerSubmitRouter);
 // 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함)
 router.use("/", compatV1Router);
 
-// 기존 Auth (로그인/SMS/리프레시/로그아웃/ME 등)
-router.use("/auth", authRouter);
-
 // KYC (PASS/NICE 등)
 router.use("/auth", kycRouter);
 
 // User (프로필 등)
 router.use("/user", userRouter);
-
-// 호환성 라우터 (Deprecated 엔드포인트들)
-router.use("/", compatV1Router);
 
 export default router;

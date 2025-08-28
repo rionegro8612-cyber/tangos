@@ -1,12 +1,15 @@
 import { redis } from "../lib/redis";
 
 const memOTP = new Map<string, { code: string; exp: number }>();
-const memRL  = new Map<string, { n: number; exp: number }>();
+const memRL = new Map<string, { n: number; exp: number }>();
 
-function now() { return Date.now(); }
+function now() {
+  return Date.now();
+}
 
 function parseIntSafe(v: any, d: number) {
-  const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
 }
 
 export async function rlIncr(key: string, windowSec: number): Promise<number> {
@@ -20,18 +23,18 @@ export async function rlIncr(key: string, windowSec: number): Promise<number> {
   } catch (e) {
     console.warn("[rate-limit] redis error:", (e as any)?.message);
   }
-  
+
   // 🚨 메모리 폴백 로직 수정 및 디버깅
   const item = memRL.get(key);
   const currentTime = now();
   const exp = currentTime + windowSec * 1000;
-  
+
   console.log(`[rate-limit] Memory fallback for ${key}:`, {
     existing: item ? { n: item.n, exp: item.exp, current: currentTime } : null,
     windowSec,
-    newExp: exp
+    newExp: exp,
   });
-  
+
   if (!item || item.exp < currentTime) {
     // 새로운 윈도우 시작
     const newItem = { n: 1, exp };
@@ -52,7 +55,11 @@ export async function checkRate(key: string, limit: number, windowSec: number): 
 }
 
 // 레이트리밋 상세 정보 반환 함수 추가
-export async function getRateLimitInfo(key: string, limit: number, windowSec: number): Promise<{
+export async function getRateLimitInfo(
+  key: string,
+  limit: number,
+  windowSec: number,
+): Promise<{
   current: number;
   limit: number;
   remaining: number;
@@ -65,19 +72,19 @@ export async function getRateLimitInfo(key: string, limit: number, windowSec: nu
       const n = current ? parseInt(current) : 0;
       const ttl = await redis.ttl(key);
       const resetSec = ttl > 0 ? ttl : windowSec;
-      
+
       return {
         current: n,
         limit,
         remaining: Math.max(0, limit - n),
         resetSec,
-        isExceeded: n > limit
+        isExceeded: n > limit,
       };
     }
   } catch (e) {
     console.warn("[rate-limit] redis error:", (e as any)?.message);
   }
-  
+
   // memory fallback
   const item = memRL.get(key);
   if (!item || item.exp < now()) {
@@ -86,16 +93,16 @@ export async function getRateLimitInfo(key: string, limit: number, windowSec: nu
       limit,
       remaining: limit,
       resetSec: windowSec,
-      isExceeded: false
+      isExceeded: false,
     };
   }
-  
+
   return {
     current: item.n,
     limit,
     remaining: Math.max(0, limit - item.n),
     resetSec: Math.ceil((item.exp - now()) / 1000),
-    isExceeded: item.n > limit
+    isExceeded: item.n > limit,
   };
 }
 

@@ -2,20 +2,20 @@
 import fs from "fs";
 import path from "path";
 
-type LocItem = { 
-  label: string; 
-  code?: string; 
-  lat?: number; 
-  lng?: number; 
-  source: "kakao" | "vworld" | "local" 
+type LocItem = {
+  label: string;
+  code?: string;
+  lat?: number;
+  lng?: number;
+  source: "kakao" | "vworld" | "local";
 };
 
 const KAKAO_KEY = process.env.KAKAO_REST_KEY;
 const VWORLD_KEY = process.env.VWORLD_KEY;
 const localPath = path.join(process.cwd(), "resources", "regions_kr.sample.json");
 
-function normalizeQ(q: string) { 
-  return q.trim().replace(/\s+/g, " "); 
+function normalizeQ(q: string) {
+  return q.trim().replace(/\s+/g, " ");
 }
 
 function norm(
@@ -23,7 +23,7 @@ function norm(
   lat?: number | null,
   lng?: number | null,
   code?: string | null,
-  source: "kakao"|"vworld"|"local" = "local"
+  source: "kakao" | "vworld" | "local" = "local",
 ): LocItem | null {
   const L = (label || "").trim();
   if (!L) return null;
@@ -32,8 +32,8 @@ function norm(
   const out: LocItem = {
     label: L,
     source,
-    ...(lat  != null ? { lat:  Number(lat) } : {}),
-    ...(lng  != null ? { lng:  Number(lng) } : {}),
+    ...(lat != null ? { lat: Number(lat) } : {}),
+    ...(lng != null ? { lng: Number(lng) } : {}),
     ...(code != null && code !== "" ? { code: String(code) } : {}),
   };
   return out;
@@ -42,7 +42,7 @@ function norm(
 export async function searchLocation(qRaw: string): Promise<LocItem[]> {
   const q = normalizeQ(qRaw);
   if (!q) return [];
-  
+
   const results: LocItem[] = [];
 
   // 1) Kakao (키워드 검색 → 주소/장소)
@@ -51,15 +51,15 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
       const url = new URL("https://dapi.kakao.com/v2/local/search/keyword.json");
       url.searchParams.set("query", q);
       url.searchParams.set("size", "10");
-      const r = await fetch(url, { 
-        headers: { Authorization: `KakaoAK ${KAKAO_KEY}` }
+      const r = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${KAKAO_KEY}` },
       });
       if (r.ok) {
         const j: any = await r.json();
-        for (const d of (j.documents ?? [])) {
+        for (const d of j.documents ?? []) {
           const label = d.place_name || d.address_name || d.road_address_name;
-          const lat = d.y ? Number(d.y) : (d.latitude ? Number(d.latitude) : undefined);
-          const lng = d.x ? Number(d.x) : (d.longitude ? Number(d.longitude) : undefined);
+          const lat = d.y ? Number(d.y) : d.latitude ? Number(d.latitude) : undefined;
+          const lng = d.x ? Number(d.x) : d.longitude ? Number(d.longitude) : undefined;
           const item = norm(label, lat, lng, /*code*/ null, "kakao");
           if (item) results.push(item);
         }
@@ -104,10 +104,8 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
       const raw = fs.readFileSync(localPath, "utf8");
       const arr = JSON.parse(raw) as any[];
       const qlc = q.toLowerCase();
-      const filtered = arr.filter(x => 
-        String(x.label).toLowerCase().includes(qlc)
-      ).slice(0, 10);
-      
+      const filtered = arr.filter((x) => String(x.label).toLowerCase().includes(qlc)).slice(0, 10);
+
       for (const f of filtered) {
         const lit = norm(f.label, f.lat ?? null, f.lng ?? null, f.code ?? null, "local");
         if (lit) results.push(lit);
@@ -119,10 +117,12 @@ export async function searchLocation(qRaw: string): Promise<LocItem[]> {
 
   // 중복 제거(라벨 기준)
   const seen = new Set<string>();
-  return results.filter(it => {
-    const k = `${it.label}|${it.lat}|${it.lng}`;
-    if (seen.has(k)) return false;
-    seen.add(k); 
-    return true;
-  }).slice(0, 10);
+  return results
+    .filter((it) => {
+      const k = `${it.label}|${it.lat}|${it.lng}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 10);
 }

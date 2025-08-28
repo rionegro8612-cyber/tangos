@@ -1,8 +1,7 @@
 ﻿const { Client } = require("pg");
 
 const conn = process.env.DATABASE_URL || "";
-const isLocal =
-  /:\/\/[^@]*@(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(conn);
+const isLocal = /:\/\/[^@]*@(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(conn);
 
 const client = new Client({
   connectionString: conn,

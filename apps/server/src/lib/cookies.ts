@@ -25,7 +25,7 @@ function getCookieDomain(): string | undefined {
 function baseCookieOptions(maxAgeMs: number): CookieOptions {
   const secure = process.env.COOKIE_SECURE === "true" || isProd;
   const sameSite = process.env.COOKIE_SAMESITE?.toLowerCase() || (isProd ? "none" : "lax");
-  
+
   // 프로덕션에서 SameSite=none일 때 secure=true 필수
   if (sameSite === "none" && !secure) {
     console.warn("[COOKIE] SameSite=none requires secure=true, falling back to lax");
@@ -38,7 +38,7 @@ function baseCookieOptions(maxAgeMs: number): CookieOptions {
       domain: getCookieDomain(),
     };
   }
-  
+
   return {
     httpOnly: true,
     secure,
@@ -81,8 +81,11 @@ export function clearAuthCookies(res: Response) {
  * 쿠키에서 액세스 토큰 읽기(우선순위: access_token → tango_at(레거시))
  *  - req.cookies 를 그대로 넣어서 사용하세요.
  */
-export function getAccessTokenFromCookies(cookies: Record<string, any> | undefined): string | undefined {
+export function getAccessTokenFromCookies(
+  cookies: Record<string, any> | undefined,
+): string | undefined {
   if (!cookies) return undefined;
-  return (cookies[ACCESS_COOKIE] as string | undefined)
-      || (cookies[COOKIE_NAME] as string | undefined);
+  return (
+    (cookies[ACCESS_COOKIE] as string | undefined) || (cookies[COOKIE_NAME] as string | undefined)
+  );
 }

@@ -156,11 +156,11 @@ export default function RegisterVerifyPage() {
       const terms = JSON.parse(termsStr);
       
                    // 1단계: OTP 코드 검증 (전화번호는 이미 +82 형식)
-       const verifyBody = {
-         phone,
-         code,
-         purpose: "signup"
-       };
+             const verifyBody = {
+        phone,
+        code,
+        context: "signup"
+      };
       console.log("[verify-code request]", verifyBody);
       
       const response = await fetch(`${API_BASE}/auth/verify-code`, {
@@ -217,18 +217,37 @@ export default function RegisterVerifyPage() {
              length: phone?.length
            });
            
+           // 🚨 백엔드 API 스펙에 맞게 데이터 변환
+           const birthYear = new Date(birth).getFullYear();
+           
            const signupBody = {
-             phone, // 이미 +82 형식으로 저장되어 있음
-             name,
-             birth: birth, // YYYY-MM-DD 형식
-             gender,
-             termsAccepted: [
-               { key: "tos", version: "1.0" },
-               { key: "privacy", version: "1.0" },
-               ...(terms.marketing ? [{ key: "marketing", version: "1.0" }] : [])
+             phone,                      // 🚨 세션에서 찾을 수 없으므로 직접 전송
+             profile: {
+               nickname: name,           // name → nickname
+               region: "서울",           // 기본값 (나중에 선택 가능)
+               birthYear: birthYear      // YYYY-MM-DD → YYYY
+             },
+             agreements: [
+               {
+                 code: "TOS",           // key → code
+                 version: "1.0",
+                 required: true,
+                 accepted: terms.tos
+               },
+               {
+                 code: "PRIVACY",       // key → code
+                 version: "1.0", 
+                 required: true,
+                 accepted: terms.privacy
+               }
              ]
            };
            console.log("[signup request]", signupBody);
+           console.log("[signup request] phone check:", {
+             phoneInBody: signupBody.phone,
+             phoneType: typeof signupBody.phone,
+             phoneLength: signupBody.phone?.length
+           });
           
                      const signupResponse = await fetch(`${API_BASE}/auth/register/submit`, {
             method: "POST",
@@ -256,6 +275,9 @@ export default function RegisterVerifyPage() {
             if (signupData.data?.refreshToken) {
               window.sessionStorage.setItem("refreshToken", signupData.data.refreshToken);
             }
+            
+            // 🚨 phoneVerified 세션 설정 (onboarding 페이지에서 필요)
+            window.sessionStorage.setItem("phoneVerified", "true");
             
             // 회원가입 완료 후 온보딩으로 이동
             router.push("/onboarding");

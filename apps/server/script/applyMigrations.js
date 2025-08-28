@@ -21,8 +21,9 @@ async function main() {
   const client = new Client({ connectionString: url });
   await client.connect();
 
-  const files = fs.readdirSync(MIG_DIR)
-    .filter(f => /_up\.sql$/i.test(f))
+  const files = fs
+    .readdirSync(MIG_DIR)
+    .filter((f) => /_up\.sql$/i.test(f))
     .sort((a, b) => a.localeCompare(b)); // 01_, 02_ 순서대로
 
   console.log("🗂  migrations dir:", MIG_DIR);
@@ -48,7 +49,7 @@ async function main() {
   console.log("\n✅ All migrations applied.");
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error(e);
   process.exit(1);
 });

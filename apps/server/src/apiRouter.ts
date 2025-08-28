@@ -21,9 +21,9 @@ router.use("/auth", authMvpRouter);
 router.use("/auth/login", loginRouter);
 
 // ✅ 기존 기능들 (별도 경로로 분리)
-router.use("/auth/refresh", refreshRouter);  // /api/v1/auth/refresh
-router.use("/auth/logout", logoutRouter);    // /api/v1/auth/logout
-router.use("/auth/kyc", kycRouter);         // /api/v1/auth/kyc/*
+router.use("/auth/refresh", refreshRouter); // /api/v1/auth/refresh
+router.use("/auth/logout", logoutRouter); // /api/v1/auth/logout
+router.use("/auth/kyc", kycRouter); // /api/v1/auth/kyc/*
 router.use("/auth/register", registerRouter); // /api/v1/auth/register/*
 
 // ✅ 프로필 라우터 마운트
@@ -34,4 +34,8 @@ router.use("/location", locationRouter);
 
 router.get("/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
 
-console.log("[apiRouter] 라우터 등록 완료", router.stack.length, router.stack.map(l => l.route?.path || l.name));
+console.log(
+  "[apiRouter] 라우터 등록 완료",
+  router.stack.length,
+  router.stack.map((l) => l.route?.path || l.name),
+);

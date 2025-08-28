@@ -1,10 +1,48 @@
-name: Main CI (no deploy)
+name: Main CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
-  reuse-pr-ci:
-    uses: ./.github/workflows/pr.yml
-    secrets: inherit
+  ci:
+    name: "메인 브랜치 CI 검증"
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Type check
+      run: npm run ci:typecheck
+      
+    - name: Lint
+      run: npm run ci:lint
+      
+    - name: Test
+      run: npm run ci:test
+      
+    - name: Build
+      run: npm run ci:build
+      
+    - name: Format check
+      run: npm run ci:format:check
+      
+    - name: CI Complete
+      run: |
+        echo "✅ 메인 브랜치 CI 검증 완료"
+        echo "🚀 ${{ github.ref_name }} 브랜치가 검증되었습니다"
+

@@ -10,18 +10,18 @@ router.get("/search", async (req, res) => {
     if (!q.trim()) {
       return res.fail("BAD_REQUEST", "q 파라미터가 필요합니다", 400);
     }
-    
+
     const items = await searchLocation(q);
-    
+
     // 프론트 표준화: label/code/lat/lng
-    const normalized = items.map(it => ({
+    const normalized = items.map((it) => ({
       label: it.label,
       code: it.code ?? null,
       lat: it.lat ?? null,
       lng: it.lng ?? null,
-      source: it.source
+      source: it.source,
     }));
-    
+
     return res.ok({ items: normalized }, "OK");
   } catch (error) {
     console.error("[location] 검색 오류:", error);
@@ -36,7 +36,7 @@ router.post("/code", async (req, res) => {
     if (!label) {
       return res.fail("BAD_REQUEST", "label이 필요합니다", 400);
     }
-    
+
     // TODO: users.profile.region_code / region_label 업데이트 (트랜잭션)
     // 현재는 성공 응답만 반환
     return res.ok({ saved: true }, "OK");

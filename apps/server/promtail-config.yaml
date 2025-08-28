@@ -18,7 +18,7 @@ scrape_configs:
           service: tango-server
           env: development
           __path__: /var/log/apps/*.log
-    
+
     pipeline_stages:
       - json:
           expressions:
@@ -32,17 +32,17 @@ scrape_configs:
             ip: ip
             latencyMs: latencyMs
             error: error
-      
+
       - labels:
           level:
           type:
           status:
           code:
-      
+
       - timestamp:
           source: timestamp
           format: RFC3339Nano
-      
+
       - output:
           source: message
 

@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import { validate } from "../middlewares/validate";
 import { SubmitSchema } from "./register.schemas";
@@ -9,7 +8,7 @@ import dayjs from "dayjs";
 
 // Redis 클라이언트
 const redis = createClient({
-  url: process.env.REDIS_URL || "redis://redis:6379"
+  url: process.env.REDIS_URL || "redis://redis:6379",
 });
 
 export const registerRouter = Router();
@@ -21,7 +20,7 @@ const KYC_MIN_AGE = Number(process.env.KYC_MIN_AGE) || 50;
 registerRouter.post("/start", async (req, res) => {
   try {
     const { phone, carrier } = req.body;
-    
+
     if (!phone || !carrier) {
       return res.status(400).json({
         success: false,
@@ -38,9 +37,9 @@ registerRouter.post("/start", async (req, res) => {
       phone,
       carrier,
       startedAt: new Date().toISOString(),
-      status: 'started'
+      status: "started",
     };
-    
+
     await redis.setex(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
 
     // 2) { requestId, ttlSec } 등 표준 응답
@@ -52,11 +51,10 @@ registerRouter.post("/start", async (req, res) => {
         started: true,
         phone,
         carrier,
-        ttlSec: 1800
+        ttlSec: 1800,
       },
       requestId: (req as any).requestId ?? null,
     });
-
   } catch (error) {
     console.error("Register start error:", error);
     return res.status(500).json({
@@ -73,7 +71,7 @@ registerRouter.post("/start", async (req, res) => {
 registerRouter.post("/verify", async (req, res) => {
   try {
     const { phone, code, context } = req.body;
-    
+
     if (!phone || !code || !context) {
       return res.status(400).json({
         success: false,
@@ -99,18 +97,40 @@ registerRouter.post("/verify", async (req, res) => {
     // 1) OTP 검증 → signup_sessions.phone_verified = true
     const sessionKey = `reg:session:${phone}`;
     const sessionData = await redis.get(sessionKey);
-    
+
     if (sessionData) {
       const session = JSON.parse(sessionData);
       session.phoneVerified = true;
       session.verifiedAt = new Date().toISOString();
-      session.status = 'verified';
-      
+      session.status = "verified";
+
       await redis.setex(sessionKey, 1800, JSON.stringify(session));
     }
 
     // OTP 코드 삭제
     await redis.del(phone);
+
+    // 🚨 회원가입 티켓 생성 (register.submit에서 필요)
+    const ticketKey = `reg:ticket:${phone}`;
+    const ticketData = {
+      phone,
+      verifiedAt: new Date().toISOString(),
+      context,
+      status: "verified"
+    };
+    
+    console.log(`[DEBUG] 가입 티켓 생성 시도: ${ticketKey}`, ticketData);
+    
+    try {
+      await redis.setex(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
+      console.log(`[DEBUG] 가입 티켓 생성 성공: ${ticketKey}`);
+      
+      // 생성 확인
+      const verifyTicket = await redis.get(ticketKey);
+      console.log(`[DEBUG] 티켓 생성 확인: ${ticketKey} = ${verifyTicket ? '존재' : '없음'}`);
+    } catch (error) {
+      console.error(`[ERROR] 티켓 생성 실패: ${ticketKey}`, error);
+    }
 
     // 2) { verified: true } 응답
     return res.json({
@@ -120,11 +140,10 @@ registerRouter.post("/verify", async (req, res) => {
       data: {
         verified: true,
         phone,
-        context
+        context,
       },
       requestId: (req as any).requestId ?? null,
     });
-
   } catch (error) {
     console.error("Register verify error:", error);
     return res.status(500).json({
@@ -142,7 +161,7 @@ registerRouter.post("/complete", async (req, res) => {
   try {
     const { profile, agreements, referralCode } = req.body;
     const phone = (req as any).session?.phone || req.body.phone;
-    
+
     if (!phone) {
       return res.status(400).json({
         success: false,
@@ -156,7 +175,7 @@ registerRouter.post("/complete", async (req, res) => {
     // 세션 확인
     const sessionKey = `reg:session:${phone}`;
     const sessionData = await redis.get(sessionKey);
-    
+
     if (!sessionData) {
       return res.status(401).json({
         success: false,
@@ -202,15 +221,15 @@ registerRouter.post("/complete", async (req, res) => {
     }
 
     // 약관 필수 항목 체크
-    type Agreement = { code: string; version: string; required: boolean; accepted: boolean; };
+    type Agreement = { code: string; version: string; required: boolean; accepted: boolean };
     const requiredNotAccepted = agreements.find((a: Agreement) => a.required && !a.accepted);
     if (requiredNotAccepted) {
       return res.status(400).json({
         success: false,
         code: "TERMS_REQUIRED",
         message: "필수 약관에 동의해주세요.",
-        data: { 
-          code: requiredNotAccepted.code 
+        data: {
+          code: requiredNotAccepted.code,
         },
         requestId: (req as any).requestId ?? null,
       });
@@ -224,7 +243,7 @@ registerRouter.post("/complete", async (req, res) => {
       birthYear: profile.birthYear,
       region: profile.region,
       age: age,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     // 4) signup_sessions 정리
@@ -237,11 +256,10 @@ registerRouter.post("/complete", async (req, res) => {
       message: "REG_COMPLETE_OK",
       data: {
         registered: true,
-        user: user
+        user: user,
       },
       requestId: (req as any).requestId ?? null,
     });
-
   } catch (error) {
     console.error("Register complete error:", error);
     return res.status(500).json({

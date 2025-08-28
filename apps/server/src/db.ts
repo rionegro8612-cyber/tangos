@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== "production") global.pgPool = pool;
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params: ReadonlyArray<unknown> = []
+  params: ReadonlyArray<unknown> = [],
 ): Promise<T[]> {
   const values = Array.from(params) as any[];
   const { rows } = await pool.query<T>(text, values);

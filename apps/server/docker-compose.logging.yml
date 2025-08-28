@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # ===== Grafana Loki (로그 수집기) =====
@@ -19,10 +19,10 @@ services:
     image: grafana/tempo:2.3.0
     container_name: tango-tempo
     ports:
-      - "3200:3200"   # HTTP
-      - "4318:4318"   # OTLP HTTP
-      - "4317:4317"   # OTLP gRPC
-    command: [ "-config.file=/etc/tempo.yaml" ]
+      - "3200:3200" # HTTP
+      - "4318:4318" # OTLP HTTP
+      - "4317:4317" # OTLP gRPC
+    command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
       - tempo-data:/tmp/tempo

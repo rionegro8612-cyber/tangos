@@ -1,0 +1,79 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const validate_1 = require("../middlewares/validate");
+const register_schemas_1 = require("./register.schemas");
+const AppError_1 = require("../errors/AppError");
+const idempotency_1 = require("../middlewares/idempotency");
+const redis_1 = require("redis");
+const dayjs_1 = __importDefault(require("dayjs"));
+// Redis 클라이언트
+const redis = (0, redis_1.createClient)({
+    url: process.env.REDIS_URL || "redis://redis:6379"
+});
+const router = (0, express_1.Router)();
+// KYC 최소 나이 제한
+const KYC_MIN_AGE = Number(process.env.KYC_MIN_AGE) || 50;
+router.post("/submit", (0, idempotency_1.withIdempotency)(), (0, validate_1.validate)(register_schemas_1.SubmitSchema), async (req, res, next) => {
+    const { profile, agreements, referralCode } = req.body;
+    try {
+        // 0) 가입 티켓 확인 (verify-code 이후 발급된 것)
+        const phone = req.session?.phone || req.body.phone;
+        if (!phone) {
+            throw new AppError_1.AppError("PHONE_NOT_FOUND", 400, "Phone number not found in session");
+        }
+        const ticketKey = `reg:ticket:${phone}`;
+        const ticket = await redis.get(ticketKey);
+        if (!ticket) {
+            throw new AppError_1.AppError("REG_TICKET_NOT_FOUND", 401, "Please verify phone first");
+        }
+        const requiredNotAccepted = agreements.find((a) => a.required && !a.accepted);
+        if (requiredNotAccepted) {
+            throw new AppError_1.AppError("TERMS_REQUIRED", 400, "Required term not accepted", {
+                code: requiredNotAccepted.code
+            });
+        }
+        // 2) 나이 계산 및 제한 체크
+        const age = (0, dayjs_1.default)().year() - profile.birthYear;
+        if (age < KYC_MIN_AGE) {
+            throw new AppError_1.AppError("AGE_RESTRICTION", 400, `Minimum age is ${KYC_MIN_AGE}`);
+        }
+        // 3) 트랜잭션으로 회원가입 처리
+        // TODO: 실제 DB 연동 시 기존 로직과 통합
+        const result = await createUserTransaction(phone, profile, agreements, referralCode);
+        // 4) 가입 티켓 소멸
+        await redis.del(ticketKey);
+        // 5) 성공 응답
+        res.ok({
+            user: result
+        }, "REGISTERED");
+    }
+    catch (error) {
+        // DB unique constraint 위반 매핑
+        if (error.code === "23505") {
+            if (error.constraint?.includes("nickname")) {
+                return next(new AppError_1.AppError("NICKNAME_TAKEN", 409, "Nickname already in use"));
+            }
+            if (error.constraint?.includes("phone")) {
+                return next(new AppError_1.AppError("ALREADY_REGISTERED", 409, "User already registered"));
+            }
+        }
+        return next(error);
+    }
+});
+// 임시 사용자 생성 함수 (기존 로직과 연동 필요)
+async function createUserTransaction(phone, profile, agreements, referralCode) {
+    // TODO: 실제 DB 연동 시 기존 createUserWithKyc 로직과 통합
+    console.log(`[REGISTER] Creating user: ${phone}, nickname: ${profile.nickname}`);
+    // 임시로 성공 응답 (실제로는 DB에 저장)
+    return {
+        id: Math.floor(Math.random() * 10000),
+        nickname: profile.nickname,
+        region: profile.region,
+        phone: phone
+    };
+}
+exports.default = router;

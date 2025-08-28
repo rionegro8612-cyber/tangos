@@ -23,8 +23,12 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 웹 클라이언트를 실행하기 전에 다음 환경변수를 설정하세요:
 
 ```bash
-# .env.local 파일 생성
-NEXT_PUBLIC_API_BASE_URL=http://localhost:4100
+# 1. .env.local.example을 .env.local로 복사
+cp .env.local.example .env.local
+
+# 2. .env.local 파일에서 필요한 값들을 설정
+# - API_BASE: 백엔드 서버 주소
+# - API 키들: 위치 검색 등에 필요한 API 키
 ```
 
 ## Authentication Flow

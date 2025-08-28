@@ -6,8 +6,8 @@ export const API_BASE = (
   "http://localhost:4100"
 ).replace(/\/+$/, "") + "/api/v1";
 
-// 기존 API_BASE (하위 호환성 유지)
-const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+// 기존 API_BASE (하위 호환성 유지) - 현재 사용되지 않음
+// const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
 
 // 새로운 StandardResponse 타입 (기존과 통합)
 export type StandardResponse<T = unknown> = {
@@ -85,12 +85,12 @@ export async function apiFetchNew<T>(input: RequestInfo, init?: RequestInit): Pr
   return body;
 }
 
-// 기존 함수들 (하위 호환성 유지)
-function buildUrl(path: string) {
-  // 백엔드 서버로 직접 요청
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE}${path}`;
-}
+// 기존 함수들 (하위 호환성 유지) - 현재 사용되지 않음
+// function buildUrl(path: string) {
+//   // 백엔드 서버로 직접 요청
+//   if (/^https?:\/\//i.test(path)) return path;
+//   return `${API_BASE}${path}`;
+// }
 
 function isJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
@@ -107,15 +107,16 @@ async function safeJson<T = any>(res: Response): Promise<T | null> {
   }
 }
 
-async function raw(path: string, init: RequestInit = {}) {
-  const res = await fetch(buildUrl(path), {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init.headers || {}) },
-    ...init,
-  });
-  const json = await safeJson<StandardResponseLegacy<any>>(res);
-  return { res, json };
-}
+// raw 함수는 현재 사용되지 않음 - 필요시 재활성화
+// async function raw(path: string, init: RequestInit = {}) {
+//   const res = await fetch(buildUrl(path), {
+//     credentials: "include",
+//     headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+//     ...init,
+//   });
+//   const json = await safeJson<StandardResponseLegacy<any>>(res);
+//   return { res, json };
+// }
 
 /** 백엔드 직접 호출로 통일된 apiFetch */
 export async function apiFetch<T = unknown>(

@@ -63,7 +63,7 @@ export async function apiPost<T = unknown>(
 ): Promise<StandardResponse<T>> {
   return api<T>(path, {
     method: "POST",
-    body: data ? JSON.stringify(data) : undefined,
+    body: data ? JSON.stringify(data) : null,
   });
 }
 
@@ -74,7 +74,7 @@ export async function apiPut<T = unknown>(
 ): Promise<StandardResponse<T>> {
   return api<T>(path, {
     method: "PUT",
-    body: data ? JSON.stringify(data) : undefined,
+    body: data ? JSON.stringify(data) : null,
   });
 }
 
@@ -82,4 +82,5 @@ export async function apiPut<T = unknown>(
 export async function apiDelete<T = unknown>(path: string): Promise<StandardResponse<T>> {
   return api<T>(path, { method: "DELETE" });
 }
+
 

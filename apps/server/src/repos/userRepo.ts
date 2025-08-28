@@ -14,7 +14,7 @@ export async function findOrCreateUserByPhoneE164(phoneE164: string) {
     SET created_at = NOW()
     RETURNING id
     `,
-    [phoneE164]
+    [phoneE164],
   );
   // 대부분 1행이 반환됩니다. (충돌 시에도 RETURNING id 보장)
   // phone_enc는 트리거가 자동으로 처리
@@ -53,7 +53,7 @@ export async function getUserProfile(userId: string) {
     FROM users
     WHERE id = $1::uuid
     `,
-    [userId]
+    [userId],
   );
   return rows[0] ?? null;
 }
@@ -67,7 +67,7 @@ export async function touchLastLogin(userId: string) {
 export async function updateUserNickname(userId: string, nickname: string | null) {
   const rows = await query<{ id: string }>(
     `UPDATE users SET nickname = $2 WHERE id = $1::uuid RETURNING id`,
-    [userId, nickname]
+    [userId, nickname],
   );
   return rows.length > 0;
 }
@@ -79,14 +79,13 @@ export async function updateKycStatus(userId: string, provider: string) {
            kyc_provider = $1,
            kyc_checked_at = NOW()
      WHERE id = $2::uuid`,
-    [provider, userId]
+    [provider, userId],
   );
 }
 
 export async function findByPhone(phone: string) {
-  const rows = await query<{ id: string }>(
-    `SELECT id FROM users WHERE phone_e164_norm = $1`,
-    [phone]
-  );
+  const rows = await query<{ id: string }>(`SELECT id FROM users WHERE phone_e164_norm = $1`, [
+    phone,
+  ]);
   return rows[0] ?? null;
 }

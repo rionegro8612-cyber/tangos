@@ -6,7 +6,7 @@ type CodeRow = {
   id: string;
   request_id: string;
   phone_e164_norm: string;
-  code_hash: string;          // "hash:salt"
+  code_hash: string; // "hash:salt"
   expire_at: string;
   used_at: string | null;
   attempt_count: number;
@@ -14,9 +14,14 @@ type CodeRow = {
 };
 
 function isDevOtpOn() {
-  const providerIsMock = String(process.env.SMS_PROVIDER || "").trim().toLowerCase() === "mock";
+  const providerIsMock =
+    String(process.env.SMS_PROVIDER || "")
+      .trim()
+      .toLowerCase() === "mock";
   const debugOtpOn = ["1", "true", "yes", "on"].includes(
-    String(process.env.DEBUG_OTP ?? "").trim().toLowerCase()
+    String(process.env.DEBUG_OTP ?? "")
+      .trim()
+      .toLowerCase(),
   );
   return providerIsMock || debugOtpOn;
 }
@@ -36,7 +41,7 @@ export async function issueCode(rawPhone: string, opts?: { forceDev?: boolean })
      WHERE phone_e164_norm = $1
      ORDER BY created_at DESC
      LIMIT 1`,
-    [phone]
+    [phone],
   );
   const last = recent[0]?.created_at ? new Date(recent[0].created_at).getTime() : 0;
   const now = Date.now();
@@ -48,7 +53,9 @@ export async function issueCode(rawPhone: string, opts?: { forceDev?: boolean })
 
   // 안전한 난수로 OTP 생성
   const len = Math.min(Math.max(Number(process.env.OTP_CODE_LEN ?? 6), 4), 8); // 4~8자리
-  const code = randomInt(0, 10 ** len).toString().padStart(len, "0");
+  const code = randomInt(0, 10 ** len)
+    .toString()
+    .padStart(len, "0");
 
   const salt = newSalt();
   const hash = hashCode(code, salt);
@@ -58,12 +65,12 @@ export async function issueCode(rawPhone: string, opts?: { forceDev?: boolean })
     `INSERT INTO auth_sms_codes (request_id, phone_e164_norm, code_hash, expire_at)
      VALUES (gen_random_uuid(), $1, $2, NOW() + ($3 || ' seconds')::interval)
      RETURNING id, request_id, expire_at`,
-    [phone, `${hash}:${salt}`, String(ttlSec)]
+    [phone, `${hash}:${salt}`, String(ttlSec)],
   );
   const row = rows[0];
 
   // mock/DEBUG_OTP 또는 forceDev면 평문 코드 동봉
-  const _codeForDev = (opts?.forceDev || isDevOtpOn()) ? code : undefined;
+  const _codeForDev = opts?.forceDev || isDevOtpOn() ? code : undefined;
 
   return {
     ok: true,
@@ -84,7 +91,7 @@ export async function verifyCode(rawPhone: string, code: string) {
      WHERE phone_e164_norm = $1
      ORDER BY created_at DESC
      LIMIT 1`,
-    [phone]
+    [phone],
   );
   const rec = rows[0];
   if (!rec) return { ok: false, code: "NO_CODE", message: "no code issued" };

@@ -25,15 +25,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Phone'
+              $ref: "#/components/schemas/Phone"
       responses:
-        '200':
+        "200":
           description: SMS 전송 성공
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
+                  - $ref: "#/components/schemas/StandardResponse"
                   - type: object
                     properties:
                       data:
@@ -47,10 +47,10 @@ paths:
                             type: integer
                             description: 재전송 대기 시간 (초)
                             example: 60
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/RateLimited'
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /auth/resend-sms:
     post:
@@ -63,15 +63,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Phone'
+              $ref: "#/components/schemas/Phone"
       responses:
-        '200':
+        "200":
           description: SMS 재전송 성공
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
+                  - $ref: "#/components/schemas/StandardResponse"
                   - type: object
                     properties:
                       data:
@@ -85,10 +85,10 @@ paths:
                             type: integer
                             description: 다음 재전송까지 대기 시간 (초)
                             example: 60
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/RateLimited'
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /auth/verify-code:
     post:
@@ -101,24 +101,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Verify'
+              $ref: "#/components/schemas/Verify"
       responses:
-        '200':
+        "200":
           description: 코드 검증 성공
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
+                  - $ref: "#/components/schemas/StandardResponse"
                   - type: object
                     properties:
                       data:
                         type: object
                         properties:
                           user:
-                            $ref: '#/components/schemas/User'
+                            $ref: "#/components/schemas/User"
                           tokens:
-                            $ref: '#/components/schemas/AuthTokens'
+                            $ref: "#/components/schemas/AuthTokens"
                           registrationTicket:
                             type: object
                             properties:
@@ -130,10 +130,10 @@ paths:
                                 type: string
                                 description: 가입 티켓 발급 메시지
                                 example: "Phone verified. You can now complete registration."
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/RateLimited'
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /auth/register/submit:
     post:
@@ -153,28 +153,28 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterSubmit'
+              $ref: "#/components/schemas/RegisterSubmit"
       responses:
-        '200':
+        "200":
           description: 회원가입 성공
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
+                  - $ref: "#/components/schemas/StandardResponse"
                   - type: object
                     properties:
                       data:
                         type: object
                         properties:
                           user:
-                            $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                            $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
 components:
   schemas:
@@ -337,7 +337,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/StandardResponse'
+              - $ref: "#/components/schemas/StandardResponse"
               - type: object
                 properties:
                   success:
@@ -353,7 +353,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/StandardResponse'
+              - $ref: "#/components/schemas/StandardResponse"
               - type: object
                 properties:
                   success:
@@ -376,7 +376,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/StandardResponse'
+              - $ref: "#/components/schemas/StandardResponse"
               - type: object
                 properties:
                   success:
@@ -392,7 +392,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/StandardResponse'
+              - $ref: "#/components/schemas/StandardResponse"
               - type: object
                 properties:
                   success:

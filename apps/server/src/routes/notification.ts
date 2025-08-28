@@ -13,7 +13,7 @@ router.post("/push", async (req, res) => {
     if (platform === "ios") r = await sendAPNs(token, payload);
     else r = await sendFCM(token, payload);
     return res.ok({ sent: true, providerTraceId: r.providerTraceId });
-  } catch (e:any) {
+  } catch (e: any) {
     return res.fail("PUSH_FAILED", e.message || "push failed", 502);
   }
 });
