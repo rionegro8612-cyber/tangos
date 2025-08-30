@@ -9,6 +9,7 @@ export default function NicknameInput(props: {
   value?: string;
   onChange?: (v: string) => void;
   onValid?: (v: string) => void;   // 사용 가능해졌을 때 콜백
+  userId?: string;  // 사용자 ID 추가
 }) {
   const [nick, setNick] = useState(props.value || '');
   const debounced = useDebouncedValue(nick, 400);
@@ -38,7 +39,7 @@ export default function NicknameInput(props: {
       try {
         setStatus('checking');
         setMsg('사용 가능 여부 확인 중…');
-        const r = await apiFetch<CheckResp>(`/api/v1/profile/nickname/check?value=${encodeURIComponent(debounced)}`, {
+        const r = await apiFetch<CheckResp>(`/api/v1/profile/nickname/check?value=${encodeURIComponent(debounced)}&userId=${props.userId || ''}`, {
           signal: ac.signal,
         });
         if (r.data?.available) {

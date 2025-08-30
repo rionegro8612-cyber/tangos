@@ -1,6 +1,7 @@
 // apps/server/src/routes/index.ts
 import { Router } from "express";
 import authRouter from "./auth.mvp";
+import { refreshRouter } from "./auth.refresh";
 import kycRouter from "./kyc.mvp";
 import userRouter from "./user";
 import compatV1Router from "./compat.v1";
@@ -15,6 +16,9 @@ router.use("/", healthRouter);
 
 // 새로운 표준 인증 API (우선순위 높음)
 router.use("/auth", authRouter);
+
+// 리프레시 토큰 갱신 API
+router.use("/auth", refreshRouter);
 
 // 새로운 표준 회원가입 API (start, verify, complete)
 router.use("/auth/register", registerRouter);

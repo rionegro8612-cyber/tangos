@@ -58,23 +58,23 @@ exports.errorTracker = new ErrorRateTracker();
 async function checkDatabase() {
     const start = Date.now();
     try {
-        await db_1.pool.query('SELECT 1');
+        await db_1.pool.query("SELECT 1");
         const latency = Date.now() - start;
         return {
-            name: 'database',
-            status: latency > 1000 ? 'degraded' : 'healthy',
-            message: latency > 1000 ? 'High latency detected' : 'Connected',
+            name: "database",
+            status: latency > 1000 ? "degraded" : "healthy",
+            message: latency > 1000 ? "High latency detected" : "Connected",
             latency,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         };
     }
     catch (error) {
         return {
-            name: 'database',
-            status: 'unhealthy',
-            message: error instanceof Error ? error.message : 'Database connection failed',
+            name: "database",
+            status: "unhealthy",
+            message: error instanceof Error ? error.message : "Database connection failed",
             latency: Date.now() - start,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         };
     }
 }
@@ -87,20 +87,20 @@ async function checkRedis() {
         await redis_1.redis.ping();
         const latency = Date.now() - start;
         return {
-            name: 'redis',
-            status: latency > 500 ? 'degraded' : 'healthy',
-            message: latency > 500 ? 'High latency detected' : 'Connected',
+            name: "redis",
+            status: latency > 500 ? "degraded" : "healthy",
+            message: latency > 500 ? "High latency detected" : "Connected",
             latency,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         };
     }
     catch (error) {
         return {
-            name: 'redis',
-            status: 'unhealthy',
-            message: error instanceof Error ? error.message : 'Redis connection failed',
+            name: "redis",
+            status: "unhealthy",
+            message: error instanceof Error ? error.message : "Redis connection failed",
             latency: Date.now() - start,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         };
     }
 }
@@ -111,10 +111,10 @@ async function checkErrorRate() {
     const errorRate = exports.errorTracker.getErrorRate();
     const threshold = 5; // 5% 임계치
     return {
-        name: 'error_rate',
-        status: errorRate > threshold ? 'unhealthy' : errorRate > threshold / 2 ? 'degraded' : 'healthy',
+        name: "error_rate",
+        status: errorRate > threshold ? "unhealthy" : errorRate > threshold / 2 ? "degraded" : "healthy",
         message: `Error rate: ${errorRate.toFixed(2)}%`,
-        timestamp: Date.now()
+        timestamp: Date.now(),
     };
 }
 /**
@@ -126,10 +126,10 @@ async function checkMemory() {
     const heapTotalMB = Math.round(usage.heapTotal / 1024 / 1024);
     const usagePercent = (usage.heapUsed / usage.heapTotal) * 100;
     return {
-        name: 'memory',
-        status: usagePercent > 90 ? 'unhealthy' : usagePercent > 80 ? 'degraded' : 'healthy',
+        name: "memory",
+        status: usagePercent > 90 ? "unhealthy" : usagePercent > 80 ? "degraded" : "healthy",
         message: `${heapUsedMB}MB / ${heapTotalMB}MB (${usagePercent.toFixed(1)}%)`,
-        timestamp: Date.now()
+        timestamp: Date.now(),
     };
 }
 /**
@@ -141,26 +141,26 @@ async function getSystemHealth() {
         checkDatabase(),
         checkRedis(),
         checkErrorRate(),
-        checkMemory()
+        checkMemory(),
     ]);
     // 전체 상태 결정
-    const hasUnhealthy = checks.some(check => check.status === 'unhealthy');
-    const hasDegraded = checks.some(check => check.status === 'degraded');
+    const hasUnhealthy = checks.some((check) => check.status === "unhealthy");
+    const hasDegraded = checks.some((check) => check.status === "degraded");
     let overall;
     if (hasUnhealthy) {
-        overall = 'unhealthy';
+        overall = "unhealthy";
     }
     else if (hasDegraded) {
-        overall = 'degraded';
+        overall = "degraded";
     }
     else {
-        overall = 'healthy';
+        overall = "healthy";
     }
     return {
         overall,
         checks,
         uptime: process.uptime(),
-        timestamp: startTime
+        timestamp: startTime,
     };
 }
 /**
@@ -175,11 +175,8 @@ function isAlive() {
  */
 async function isReady() {
     try {
-        const [dbCheck, redisCheck] = await Promise.all([
-            checkDatabase(),
-            checkRedis()
-        ]);
-        return dbCheck.status !== 'unhealthy' && redisCheck.status !== 'unhealthy';
+        const [dbCheck, redisCheck] = await Promise.all([checkDatabase(), checkRedis()]);
+        return dbCheck.status !== "unhealthy" && redisCheck.status !== "unhealthy";
     }
     catch {
         return false;
@@ -191,27 +188,27 @@ async function isReady() {
 async function shouldRollback() {
     const health = await getSystemHealth();
     // 에러율이 5% 이상이면 롤백
-    const errorRateCheck = health.checks.find(check => check.name === 'error_rate');
-    if (errorRateCheck?.status === 'unhealthy') {
+    const errorRateCheck = health.checks.find((check) => check.name === "error_rate");
+    if (errorRateCheck?.status === "unhealthy") {
         return {
             shouldRollback: true,
-            reason: `High error rate detected: ${errorRateCheck.message}`
+            reason: `High error rate detected: ${errorRateCheck.message}`,
         };
     }
     // 데이터베이스가 unhealthy면 롤백
-    const dbCheck = health.checks.find(check => check.name === 'database');
-    if (dbCheck?.status === 'unhealthy') {
+    const dbCheck = health.checks.find((check) => check.name === "database");
+    if (dbCheck?.status === "unhealthy") {
         return {
             shouldRollback: true,
-            reason: `Database unhealthy: ${dbCheck.message}`
+            reason: `Database unhealthy: ${dbCheck.message}`,
         };
     }
     // 메모리 사용량이 90% 이상이면 롤백
-    const memoryCheck = health.checks.find(check => check.name === 'memory');
-    if (memoryCheck?.status === 'unhealthy') {
+    const memoryCheck = health.checks.find((check) => check.name === "memory");
+    if (memoryCheck?.status === "unhealthy") {
         return {
             shouldRollback: true,
-            reason: `High memory usage: ${memoryCheck.message}`
+            reason: `High memory usage: ${memoryCheck.message}`,
         };
     }
     return { shouldRollback: false };

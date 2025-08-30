@@ -1,15 +1,21 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useAuthStore } from "@/store/auth";
 
-async function checkNickname(value: string){
+async function checkNickname(value: string, userId?: string){
   const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
-  const res = await fetch(`${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}`, {
+  const url = userId 
+    ? `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}&userId=${encodeURIComponent(userId)}`
+    : `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}`;
+  
+  const res = await fetch(url, {
     credentials: "include"
   });
   return res.json();
 }
 
 export default function NicknamePage(){
+  const user = useAuthStore((s) => s.user);
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<"idle"|"checking"|"ok"|"dup"|"invalid">("idle");
   const [msg, setMsg] = useState("");
@@ -23,14 +29,14 @@ export default function NicknamePage(){
 
     setStatus("checking");
     const t = setTimeout(async () => {
-      const j = await checkNickname(value);
+      const j = await checkNickname(value, user?.id?.toString());
       const ok = j?.data?.available === true;
       setStatus(ok ? "ok" : "dup");
       setMsg(ok ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다.");
     }, 500); // 500ms 디바운스
 
     return () => clearTimeout(t);
-  }, [value, valid]);
+  }, [value, valid, user?.id]);
 
   const canNext = status === "ok";
 

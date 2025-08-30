@@ -1,0 +1,6 @@
+{
+  "allowEdit": [
+    ".env",
+    ".env.local"
+  ]
+}

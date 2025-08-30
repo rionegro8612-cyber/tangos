@@ -30,4 +30,4 @@ exports.router.use("/profile", profile_1.default);
 // ✅ 위치 검색 라우터 마운트
 exports.router.use("/location", location_1.locationRouter);
 exports.router.get("/_ping", (_req, res) => res.status(200).type("text/plain").send("pong"));
-console.log("[apiRouter] 라우터 등록 완료", exports.router.stack.length, exports.router.stack.map(l => l.route?.path || l.name));
+console.log("[apiRouter] 라우터 등록 완료", exports.router.stack.length, exports.router.stack.map((l) => l.route?.path || l.name));

@@ -10,5 +10,5 @@ const DATABASE_URL = "postgres://tango:tango123@localhost:5432/tango";
   // await client.query("DELETE FROM users WHERE ...");
 
   await client.end();
-  console.log("cleanup_test_data done");
+  console.log("cleanup_test_data done");         
 })();

@@ -31,7 +31,7 @@ function trackResponse(req, res) {
     const isError = res.statusCode >= 400;
     health_1.errorTracker.addRequest(endpoint, isError);
     // 에러인 경우 추가 로깅
-    if (isError && process.env.NODE_ENV === 'development') {
+    if (isError && process.env.NODE_ENV === "development") {
         console.log(`[ERROR_TRACKING] ${endpoint}: ${res.statusCode}`);
     }
 }
@@ -43,8 +43,8 @@ function getEndpointKey(req) {
     const path = req.route?.path || req.path;
     // 패턴화된 경로로 변환 (ID 등 동적 부분 제거)
     const normalizedPath = path
-        .replace(/\/\d+/g, '/:id')
-        .replace(/\/[a-f0-9-]{36}/g, '/:uuid')
-        .replace(/\/[a-f0-9]{24}/g, '/:objectId');
+        .replace(/\/\d+/g, "/:id")
+        .replace(/\/[a-f0-9-]{36}/g, "/:uuid")
+        .replace(/\/[a-f0-9]{24}/g, "/:objectId");
     return `${method} ${normalizedPath}`;
 }

@@ -63,6 +63,8 @@ async function updateKycStatus(userId, provider) {
      WHERE id = $2::uuid`, [provider, userId]);
 }
 async function findByPhone(phone) {
-    const rows = await (0, db_1.query)(`SELECT id FROM users WHERE phone_e164_norm = $1`, [phone]);
+    const rows = await (0, db_1.query)(`SELECT id FROM users WHERE phone_e164_norm = $1`, [
+        phone,
+    ]);
     return rows[0] ?? null;
 }

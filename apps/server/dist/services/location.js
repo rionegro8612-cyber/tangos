@@ -39,14 +39,14 @@ async function searchLocation(qRaw) {
             url.searchParams.set("query", q);
             url.searchParams.set("size", "10");
             const r = await fetch(url, {
-                headers: { Authorization: `KakaoAK ${KAKAO_KEY}` }
+                headers: { Authorization: `KakaoAK ${KAKAO_KEY}` },
             });
             if (r.ok) {
                 const j = await r.json();
-                for (const d of (j.documents ?? [])) {
+                for (const d of j.documents ?? []) {
                     const label = d.place_name || d.address_name || d.road_address_name;
-                    const lat = d.y ? Number(d.y) : (d.latitude ? Number(d.latitude) : undefined);
-                    const lng = d.x ? Number(d.x) : (d.longitude ? Number(d.longitude) : undefined);
+                    const lat = d.y ? Number(d.y) : d.latitude ? Number(d.latitude) : undefined;
+                    const lng = d.x ? Number(d.x) : d.longitude ? Number(d.longitude) : undefined;
                     const item = norm(label, lat, lng, /*code*/ null, "kakao");
                     if (item)
                         results.push(item);
@@ -93,7 +93,7 @@ async function searchLocation(qRaw) {
             const raw = fs_1.default.readFileSync(localPath, "utf8");
             const arr = JSON.parse(raw);
             const qlc = q.toLowerCase();
-            const filtered = arr.filter(x => String(x.label).toLowerCase().includes(qlc)).slice(0, 10);
+            const filtered = arr.filter((x) => String(x.label).toLowerCase().includes(qlc)).slice(0, 10);
             for (const f of filtered) {
                 const lit = norm(f.label, f.lat ?? null, f.lng ?? null, f.code ?? null, "local");
                 if (lit)
@@ -106,11 +106,13 @@ async function searchLocation(qRaw) {
     }
     // 중복 제거(라벨 기준)
     const seen = new Set();
-    return results.filter(it => {
+    return results
+        .filter((it) => {
         const k = `${it.label}|${it.lat}|${it.lng}`;
         if (seen.has(k))
             return false;
         seen.add(k);
         return true;
-    }).slice(0, 10);
+    })
+        .slice(0, 10);
 }

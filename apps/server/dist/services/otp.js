@@ -7,7 +7,7 @@ exports.hash = exports.genCode = void 0;
 exports.canSend = canSend;
 const crypto_1 = __importDefault(require("crypto"));
 const redis_1 = require("../lib/redis");
-const genCode = () => ("" + Math.floor(100000 + Math.random() * 900000));
+const genCode = () => "" + Math.floor(100000 + Math.random() * 900000);
 exports.genCode = genCode;
 const hash = (s) => crypto_1.default.createHash("sha256").update(s).digest("hex");
 exports.hash = hash;
@@ -17,9 +17,7 @@ const LIMIT_PER_IP = 20;
 async function canSend(phone, ip) {
     const kPhone = `rl:otp:phone:${phone}`;
     const kIP = `rl:otp:ip:${ip}`;
-    const p = redis_1.redis.multi()
-        .incr(kPhone).expire(kPhone, WINDOW_SEC)
-        .incr(kIP).expire(kIP, WINDOW_SEC);
+    const p = redis_1.redis.multi().incr(kPhone).expire(kPhone, WINDOW_SEC).incr(kIP).expire(kIP, WINDOW_SEC);
     const res = await p.exec();
     // Redis multi exec 결과 타입 안전하게 처리
     if (!res)

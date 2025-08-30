@@ -31,7 +31,7 @@ function calcAge(birthYmd) {
 router.post("/kyc/pass", async (req, res) => {
     const rid = req.id;
     try {
-        const { name = "", birth = "", phone = "", carrier = "" } = (req.body || {});
+        const { name = "", birth = "", phone = "", carrier = "", } = (req.body || {});
         // 기본 파라미터 체크
         if (!name || !birth || !phone || !carrier) {
             return res.status(400).json({

@@ -32,11 +32,11 @@ function errorHandler(err, req, res, _next) {
     }
     // 기존 에러 처리 (최종 fallback)
     const httpStatus = err?.status || err?.statusCode || 500;
-    const errorCode = httpStatus >= 500 ? "INTERNAL_ERROR" : (err?.code || "ERROR");
-    const message = err?.message || 'Internal Server Error';
+    const errorCode = httpStatus >= 500 ? "INTERNAL_ERROR" : err?.code || "ERROR";
+    const message = err?.message || "Internal Server Error";
     // 개발환경에서는 상세 에러 로그 출력
-    if (process.env.NODE_ENV === 'development') {
-        console.error('[ERROR]', {
+    if (process.env.NODE_ENV === "development") {
+        console.error("[ERROR]", {
             code: errorCode,
             message,
             stack: err?.stack,

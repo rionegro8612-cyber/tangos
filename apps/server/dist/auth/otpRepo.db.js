@@ -40,27 +40,23 @@ async function canSend(phone) {
         return { ok: waitMs <= 0, waitMs: Math.max(0, waitMs) };
     }
     catch (error) {
-        console.error('canSend error:', error);
+        console.error("canSend error:", error);
         return { ok: true, waitMs: 0 }; // 에러 시 기본값 반환
     }
 }
-async function putCode(phone, code, purpose = 'login') {
+async function putCode(phone, code, purpose = "login") {
     const now = Date.now();
-    const codeHash = (0, crypto_1.createHash)('sha256').update(code).digest('hex');
+    const codeHash = (0, crypto_1.createHash)("sha256").update(code).digest("hex");
     try {
         // 기존 코드 삭제 (같은 전화번호, 같은 목적)
-        await pool.query('DELETE FROM auth_sms_codes WHERE phone_e164_norm = $1 AND purpose = $2', [phone, purpose]);
+        await pool.query("DELETE FROM auth_sms_codes WHERE phone_e164_norm = $1 AND purpose = $2", [
+            phone,
+            purpose,
+        ]);
         // 새 코드 저장
         await pool.query(`INSERT INTO auth_sms_codes 
        (phone_e164_norm, code_hash, purpose, expire_at, try_count, max_try) 
-       VALUES ($1, $2, $3, $4, $5, $6)`, [
-            phone,
-            codeHash,
-            purpose,
-            new Date(now + TTL_SEC * SEC),
-            0,
-            MAX_ATTEMPTS
-        ]);
+       VALUES ($1, $2, $3, $4, $5, $6)`, [phone, codeHash, purpose, new Date(now + TTL_SEC * SEC), 0, MAX_ATTEMPTS]);
         const record = {
             code,
             expiresAt: now + TTL_SEC * SEC,
@@ -71,8 +67,8 @@ async function putCode(phone, code, purpose = 'login') {
         return record;
     }
     catch (error) {
-        console.error('putCode error:', error);
-        throw new Error('Failed to store OTP code');
+        console.error("putCode error:", error);
+        throw new Error("Failed to store OTP code");
     }
 }
 async function getRecord(phone) {
@@ -86,7 +82,7 @@ async function getRecord(phone) {
         }
         const row = result.rows[0];
         return {
-            code: '[HIDDEN]', // 보안상 실제 코드는 반환하지 않음
+            code: "[HIDDEN]", // 보안상 실제 코드는 반환하지 않음
             expiresAt: row.expire_at.getTime(),
             attempts: row.try_count,
             lastSentAt: row.created_at.getTime(),
@@ -94,7 +90,7 @@ async function getRecord(phone) {
         };
     }
     catch (error) {
-        console.error('getRecord error:', error);
+        console.error("getRecord error:", error);
         return null;
     }
 }
@@ -117,16 +113,19 @@ async function incAttempt(phone) {
         return try_count;
     }
     catch (error) {
-        console.error('incAttempt error:', error);
+        console.error("incAttempt error:", error);
         return 0;
     }
 }
 async function clear(phone) {
     try {
-        await pool.query('DELETE FROM auth_sms_codes WHERE phone_e164_norm = $1 AND purpose = $2', [phone, 'login']);
+        await pool.query("DELETE FROM auth_sms_codes WHERE phone_e164_norm = $1 AND purpose = $2", [
+            phone,
+            "login",
+        ]);
     }
     catch (error) {
-        console.error('clear error:', error);
+        console.error("clear error:", error);
     }
 }
 async function isLocked(phone) {
@@ -147,7 +146,7 @@ async function isLocked(phone) {
         return false;
     }
     catch (error) {
-        console.error('isLocked error:', error);
+        console.error("isLocked error:", error);
         return false;
     }
 }
@@ -158,9 +157,9 @@ function getConstants() {
 function generateCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
-async function verifyCode(phone, code, purpose = 'login') {
+async function verifyCode(phone, code, purpose = "login") {
     try {
-        const codeHash = (0, crypto_1.createHash)('sha256').update(code).digest('hex');
+        const codeHash = (0, crypto_1.createHash)("sha256").update(code).digest("hex");
         const result = await pool.query(`SELECT id, expire_at, try_count, max_try 
        FROM auth_sms_codes 
        WHERE phone_e164_norm = $1 AND purpose = $2 AND code_hash = $3`, [phone, purpose, codeHash]);
@@ -189,7 +188,7 @@ async function verifyCode(phone, code, purpose = 'login') {
         return true;
     }
     catch (error) {
-        console.error('verifyCode error:', error);
+        console.error("verifyCode error:", error);
         return false;
     }
 }

@@ -36,20 +36,20 @@ class AuditLogger {
             ...this.getTraceInfo(),
             userIp,
             userAgent,
-            eventType: 'USER_REGISTRATION',
-            eventCategory: 'ACCOUNT_MANAGEMENT',
-            action: 'create',
-            resourceType: 'user',
+            eventType: "USER_REGISTRATION",
+            eventCategory: "ACCOUNT_MANAGEMENT",
+            action: "create",
+            resourceType: "user",
             resourceId: userData.id || userData.userId,
-            resourcePath: '/auth/register',
+            resourcePath: "/auth/register",
             newValue: this.sanitizeUserData(userData),
             adminAction,
             consentRequired: true,
             retentionDays: 2555, // 7년 (개인정보보호법)
-            legalBasis: '개인정보보호법 제15조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: "개인정보보호법 제15조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -68,19 +68,19 @@ class AuditLogger {
             userPhone: (0, security_1.maskPhone)(userPhone),
             userIp,
             userAgent,
-            eventType: 'USER_LOGIN',
-            eventCategory: 'ACCESS_CONTROL',
-            action: 'read',
-            resourceType: 'user',
+            eventType: "USER_LOGIN",
+            eventCategory: "ACCESS_CONTROL",
+            action: "read",
+            resourceType: "user",
             resourceId: userId,
-            resourcePath: '/auth/login',
+            resourcePath: "/auth/login",
             sessionId,
             tokenType,
             retentionDays: 1095, // 3년 (통신비밀보호법)
-            legalBasis: '통신비밀보호법 제13조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: "통신비밀보호법 제13조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -98,27 +98,27 @@ class AuditLogger {
             userId,
             userPhone: (0, security_1.maskPhone)(userPhone),
             userIp,
-            eventType: 'PROFILE_UPDATE',
-            eventCategory: 'ACCOUNT_MANAGEMENT',
-            action: 'update',
-            resourceType: 'user',
+            eventType: "PROFILE_UPDATE",
+            eventCategory: "ACCOUNT_MANAGEMENT",
+            action: "update",
+            resourceType: "user",
             resourceId: userId,
-            resourcePath: '/user/profile',
+            resourcePath: "/user/profile",
             oldValue: this.sanitizeUserData(oldData),
             newValue: this.sanitizeUserData(newData),
-            changes: changes.map(change => ({
+            changes: changes.map((change) => ({
                 ...change,
-                oldValue: change.sensitive ? '[REDACTED]' : change.oldValue,
-                newValue: change.sensitive ? '[REDACTED]' : change.newValue
+                oldValue: change.sensitive ? "[REDACTED]" : change.oldValue,
+                newValue: change.sensitive ? "[REDACTED]" : change.newValue,
             })),
             reason,
             adminAction,
             consentRequired: true,
             retentionDays: 2555,
-            legalBasis: '개인정보보호법 제15조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: "개인정보보호법 제15조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -136,28 +136,30 @@ class AuditLogger {
             ...this.getTraceInfo(),
             userId: adminUserId,
             userIp,
-            eventType: 'ROLE_ASSIGNMENT',
-            eventCategory: 'ACCESS_CONTROL',
-            action: 'update',
-            resourceType: 'user_role',
+            eventType: "ROLE_ASSIGNMENT",
+            eventCategory: "ACCESS_CONTROL",
+            action: "update",
+            resourceType: "user_role",
             resourceId: targetUserId,
-            resourcePath: '/admin/users/roles',
+            resourcePath: "/admin/users/roles",
             oldValue: { userId: targetUserId, roles: [] },
             newValue: { userId: targetUserId, roles: [role] },
-            changes: [{
-                    field: 'roles',
+            changes: [
+                {
+                    field: "roles",
                     oldValue: [],
                     newValue: [role],
-                    changeType: 'added',
-                    sensitive: false
-                }],
+                    changeType: "added",
+                    sensitive: false,
+                },
+            ],
             reason,
             adminAction: true,
             retentionDays: 2555,
-            legalBasis: '개인정보보호법 제15조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'admin'
+            legalBasis: "개인정보보호법 제15조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "admin",
         };
         this.addLog(logEntry);
         return eventId;
@@ -177,24 +179,24 @@ class AuditLogger {
             userPhone: (0, security_1.maskPhone)(userPhone),
             userIp,
             userAgent,
-            eventType: action === 'accept' ? 'TERMS_ACCEPT' : 'TERMS_WITHDRAW',
-            eventCategory: 'CONSENT_MANAGEMENT',
+            eventType: action === "accept" ? "TERMS_ACCEPT" : "TERMS_WITHDRAW",
+            eventCategory: "CONSENT_MANAGEMENT",
             action,
-            resourceType: 'terms_consent',
+            resourceType: "terms_consent",
             resourceId: `${userId}_${termsType}_${version}`,
             resourcePath: `/consent/${termsType}`,
             newValue: {
                 termsType,
                 version,
                 action,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             },
             consentRequired: false, // 이미 동의한 내용
             retentionDays: 2555,
-            legalBasis: '개인정보보호법 제15조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: "개인정보보호법 제15조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -214,19 +216,19 @@ class AuditLogger {
             userPhone: (0, security_1.maskPhone)(userPhone),
             userIp,
             userAgent,
-            eventType: 'PII_VIEW',
-            eventCategory: 'PRIVACY_PROTECTION',
-            action: 'read',
-            resourceType: 'pii_data',
+            eventType: "PII_VIEW",
+            eventCategory: "PRIVACY_PROTECTION",
+            action: "read",
+            resourceType: "pii_data",
             resourceId: dataId,
             resourcePath: `/user/data/${dataType}`,
             reason: `개인정보 열람: ${reason}`,
-            adminAction: reason === 'admin_review',
+            adminAction: reason === "admin_review",
             retentionDays: 1095,
-            legalBasis: '개인정보보호법 제38조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: "개인정보보호법 제38조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -245,19 +247,19 @@ class AuditLogger {
             userPhone: (0, security_1.maskPhone)(userPhone),
             userIp,
             userAgent,
-            eventType: 'PII_DELETE',
-            eventCategory: 'PRIVACY_PROTECTION',
-            action: 'delete',
-            resourceType: 'pii_data',
+            eventType: "PII_DELETE",
+            eventCategory: "PRIVACY_PROTECTION",
+            action: "delete",
+            resourceType: "pii_data",
             resourceId: userId,
             resourcePath: `/user/data/${dataType}`,
             reason: `개인정보 삭제 요청: ${reason}`,
             adminAction: false,
             retentionDays: 2555, // 삭제 요청은 더 오래 보존
-            legalBasis: legalBasis || '개인정보보호법 제17조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'api'
+            legalBasis: legalBasis || "개인정보보호법 제17조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "api",
         };
         this.addLog(logEntry);
         return eventId;
@@ -277,23 +279,23 @@ class AuditLogger {
             userPhone: userPhone ? (0, security_1.maskPhone)(userPhone) : undefined,
             userIp,
             userAgent,
-            eventType: 'SECURITY_ALERT',
-            eventCategory: 'SECURITY_MONITORING',
-            action: 'create',
-            resourceType: 'security_alert',
+            eventType: "SECURITY_ALERT",
+            eventCategory: "SECURITY_MONITORING",
+            action: "create",
+            resourceType: "security_alert",
             resourceId: alertType,
-            resourcePath: '/security/alerts',
+            resourcePath: "/security/alerts",
             newValue: {
                 alertType,
                 severity,
                 description,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             },
             retentionDays: 2555,
-            legalBasis: '개인정보보호법 제29조',
-            environment: process.env.NODE_ENV || 'development',
-            version: process.env.npm_package_version || '1.0.0',
-            source: 'system'
+            legalBasis: "개인정보보호법 제29조",
+            environment: process.env.NODE_ENV || "development",
+            version: process.env.npm_package_version || "1.0.0",
+            source: "system",
         };
         this.addLog(logEntry);
         return eventId;
@@ -310,7 +312,7 @@ class AuditLogger {
                 const spanContext = span.spanContext();
                 return {
                     traceId: spanContext.traceId,
-                    spanId: spanContext.spanId
+                    spanId: spanContext.spanId,
                 };
             }
         }
@@ -318,8 +320,8 @@ class AuditLogger {
             // OpenTelemetry가 비활성화된 경우 무시
         }
         return {
-            traceId: 'unknown',
-            spanId: 'unknown'
+            traceId: "unknown",
+            spanId: "unknown",
         };
     }
     /**
@@ -337,9 +339,9 @@ class AuditLogger {
         if (sanitized.name)
             sanitized.name = (0, security_1.maskName)(sanitized.name);
         if (sanitized.password)
-            sanitized.password = '[REDACTED]';
+            sanitized.password = "[REDACTED]";
         if (sanitized.token)
-            sanitized.token = '[REDACTED]';
+            sanitized.token = "[REDACTED]";
         return sanitized;
     }
     /**
@@ -364,8 +366,8 @@ class AuditLogger {
             this.logs = this.logs.slice(-this.maxLogs);
         }
         // 콘솔에 감사 로그 출력 (개발 환경)
-        if (process.env.NODE_ENV === 'development') {
-            console.log('[AUDIT]', {
+        if (process.env.NODE_ENV === "development") {
+            console.log("[AUDIT]", {
                 id: enhancedLogEntry.id,
                 eventType: enhancedLogEntry.eventType,
                 action: enhancedLogEntry.action,
@@ -374,7 +376,7 @@ class AuditLogger {
                 timestamp: enhancedLogEntry.timestamp,
                 lifecycleStage: enhancedLogEntry.lifecycleStage,
                 compressed: enhancedLogEntry.compressed,
-                sampled: enhancedLogEntry.sampled
+                sampled: enhancedLogEntry.sampled,
             });
         }
     }
@@ -392,7 +394,7 @@ class AuditLogger {
         let compressedLog = logEntry;
         let compressed = false;
         let compressedSize = originalSize;
-        if (lifecycleStage !== 'hot') {
+        if (lifecycleStage !== "hot") {
             compressedLog = (0, log_retention_1.compressLog)(logEntry);
             compressed = true;
             compressedSize = JSON.stringify(compressedLog).length;
@@ -404,7 +406,7 @@ class AuditLogger {
             compressed,
             sampled,
             originalSize,
-            compressedSize
+            compressedSize,
         };
     }
     /**
@@ -413,16 +415,16 @@ class AuditLogger {
     getLogLifecycleStage(logEntry) {
         const logAge = this.getLogAge(logEntry.timestamp);
         if (logAge <= 7) {
-            return 'hot';
+            return "hot";
         }
         else if (logAge <= 30) {
-            return 'warm';
+            return "warm";
         }
         else if (logAge <= 90) {
-            return 'cold';
+            return "cold";
         }
         else {
-            return 'archived';
+            return "archived";
         }
     }
     /**
@@ -445,19 +447,19 @@ class AuditLogger {
      * 사용자별 감사 로그 조회
      */
     getLogsByUser(userId) {
-        return this.logs.filter(log => log.userId === userId);
+        return this.logs.filter((log) => log.userId === userId);
     }
     /**
      * 이벤트 타입별 감사 로그 조회
      */
     getLogsByEventType(eventType) {
-        return this.logs.filter(log => log.eventType === eventType);
+        return this.logs.filter((log) => log.eventType === eventType);
     }
     /**
      * 기간별 감사 로그 조회
      */
     getLogsByDateRange(startDate, endDate) {
-        return this.logs.filter(log => {
+        return this.logs.filter((log) => {
             const logDate = new Date(log.timestamp);
             return logDate >= startDate && logDate <= endDate;
         });
@@ -471,7 +473,7 @@ class AuditLogger {
             maxLogs: this.maxLogs,
             memoryUsage: process.memoryUsage(),
             environment: process.env.NODE_ENV,
-            version: process.env.npm_package_version
+            version: process.env.npm_package_version,
         };
     }
     /**
@@ -501,20 +503,20 @@ class AuditLogger {
             hot: { count: 0, size: 0, avgSize: 0 },
             warm: { count: 0, size: 0, avgSize: 0 },
             cold: { count: 0, size: 0, avgSize: 0 },
-            archived: { count: 0, size: 0, avgSize: 0 }
+            archived: { count: 0, size: 0, avgSize: 0 },
         };
-        this.logs.forEach(log => {
-            const stage = log.lifecycleStage || 'hot';
+        this.logs.forEach((log) => {
+            const stage = log.lifecycleStage || "hot";
             const size = log.compressedSize || log.originalSize || 0;
             // 안전한 인덱싱을 위해 'deleted' 단계 제외
-            if (stage !== 'deleted' && stats[stage]) {
+            if (stage !== "deleted" && stats[stage]) {
                 const stat = stats[stage];
                 stat.count++;
                 stat.size += size;
             }
         });
         // 평균 크기 계산
-        Object.values(stats).forEach(stat => {
+        Object.values(stats).forEach((stat) => {
             stat.avgSize = stat.count > 0 ? stat.size / stat.count : 0;
         });
         return stats;
@@ -524,8 +526,8 @@ class AuditLogger {
      */
     getCompressionStats() {
         const totalLogs = this.logs.length;
-        const compressedLogs = this.logs.filter(log => log.compressed).length;
-        const sampledLogs = this.logs.filter(log => log.sampled).length;
+        const compressedLogs = this.logs.filter((log) => log.compressed).length;
+        const sampledLogs = this.logs.filter((log) => log.sampled).length;
         const totalOriginalSize = this.logs.reduce((sum, log) => sum + (log.originalSize || 0), 0);
         const totalCompressedSize = this.logs.reduce((sum, log) => sum + (log.compressedSize || 0), 0);
         const compressionRatio = totalOriginalSize > 0 ? totalCompressedSize / totalOriginalSize : 1;
@@ -537,7 +539,7 @@ class AuditLogger {
             compressionRatio,
             sizeReduction,
             totalOriginalSize,
-            totalCompressedSize
+            totalCompressedSize,
         };
     }
 }
@@ -588,4 +590,4 @@ function logSecurityAlert(requestId, alertType, severity, description, userIp, u
     return exports.auditLogger.logSecurityAlert(requestId, alertType, severity, description, userIp, userId, userPhone, userAgent);
 }
 // ===== 초기화 완료 로그 =====
-console.log('[AUDIT] Audit logging system initialized:', exports.auditLogger.getStatus());
+console.log("[AUDIT] Audit logging system initialized:", exports.auditLogger.getStatus());

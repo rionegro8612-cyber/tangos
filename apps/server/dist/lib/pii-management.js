@@ -26,88 +26,88 @@ class PiiManager {
     // ===== 데이터 위치 초기화 =====
     initializeDataLocations() {
         // 사용자 계정 관련 데이터 위치
-        this.addDataLocation('user_accounts', {
-            table: 'users',
-            primaryKey: 'id',
-            identifierField: 'phone',
-            identifierValue: '',
+        this.addDataLocation("user_accounts", {
+            table: "users",
+            primaryKey: "id",
+            identifierField: "phone",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'legal_requirement',
+                type: "legal_requirement",
                 retentionDays: 2555, // 7년
-                legalBasis: '개인정보보호법 제15조',
-                description: '사용자 계정 정보는 서비스 제공을 위해 필요'
+                legalBasis: "개인정보보호법 제15조",
+                description: "사용자 계정 정보는 서비스 제공을 위해 필요",
             },
-            accessCount: 0
+            accessCount: 0,
         });
         // OTP 관련 데이터 위치
-        this.addDataLocation('otp_data', {
-            table: 'otp_codes',
-            primaryKey: 'id',
-            identifierField: 'phone',
-            identifierValue: '',
+        this.addDataLocation("otp_data", {
+            table: "otp_codes",
+            primaryKey: "id",
+            identifierField: "phone",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'business_need',
+                type: "business_need",
                 retentionDays: 30, // 30일
-                legalBasis: '통신비밀보호법 제13조',
-                description: 'OTP 코드는 인증 완료 후 30일간 보존'
+                legalBasis: "통신비밀보호법 제13조",
+                description: "OTP 코드는 인증 완료 후 30일간 보존",
             },
-            accessCount: 0
+            accessCount: 0,
         });
         // 인증 토큰 데이터 위치
-        this.addDataLocation('auth_tokens', {
-            table: 'auth_tokens',
-            primaryKey: 'id',
-            identifierField: 'user_id',
-            identifierValue: '',
+        this.addDataLocation("auth_tokens", {
+            table: "auth_tokens",
+            primaryKey: "id",
+            identifierField: "user_id",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'business_need',
+                type: "business_need",
                 retentionDays: 365, // 1년
-                legalBasis: '통신비밀보호법 제13조',
-                description: '인증 토큰은 보안 감사 목적으로 1년간 보존'
+                legalBasis: "통신비밀보호법 제13조",
+                description: "인증 토큰은 보안 감사 목적으로 1년간 보존",
             },
-            accessCount: 0
+            accessCount: 0,
         });
         // 로그 데이터 위치
-        this.addDataLocation('audit_logs', {
-            table: 'audit_logs',
-            primaryKey: 'id',
-            identifierField: 'user_id',
-            identifierValue: '',
+        this.addDataLocation("audit_logs", {
+            table: "audit_logs",
+            primaryKey: "id",
+            identifierField: "user_id",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'legal_requirement',
+                type: "legal_requirement",
                 retentionDays: 2555, // 7년
-                legalBasis: '개인정보보호법 제29조',
-                description: '감사 로그는 법적 요구사항에 따라 7년간 보존'
+                legalBasis: "개인정보보호법 제29조",
+                description: "감사 로그는 법적 요구사항에 따라 7년간 보존",
             },
-            accessCount: 0
+            accessCount: 0,
         });
         // 약관 동의 데이터 위치
-        this.addDataLocation('consent_records', {
-            table: 'user_consents',
-            primaryKey: 'id',
-            identifierField: 'user_id',
-            identifierValue: '',
+        this.addDataLocation("consent_records", {
+            table: "user_consents",
+            primaryKey: "id",
+            identifierField: "user_id",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'legal_requirement',
+                type: "legal_requirement",
                 retentionDays: 2555, // 7년
-                legalBasis: '개인정보보호법 제15조',
-                description: '동의 기록은 법적 분쟁 해결을 위해 7년간 보존'
+                legalBasis: "개인정보보호법 제15조",
+                description: "동의 기록은 법적 분쟁 해결을 위해 7년간 보존",
             },
-            accessCount: 0
+            accessCount: 0,
         });
         // 세션 데이터 위치
-        this.addDataLocation('session_data', {
-            table: 'user_sessions',
-            primaryKey: 'id',
-            identifierField: 'user_id',
-            identifierValue: '',
+        this.addDataLocation("session_data", {
+            table: "user_sessions",
+            primaryKey: "id",
+            identifierField: "user_id",
+            identifierValue: "",
             retentionPolicy: {
-                type: 'business_need',
+                type: "business_need",
                 retentionDays: 90, // 90일
-                legalBasis: '통신비밀보호법 제13조',
-                description: '세션 데이터는 보안 분석을 위해 90일간 보존'
+                legalBasis: "통신비밀보호법 제13조",
+                description: "세션 데이터는 보안 분석을 위해 90일간 보존",
             },
-            accessCount: 0
+            accessCount: 0,
         });
     }
     addDataLocation(dataType, location) {
@@ -120,10 +120,10 @@ class PiiManager {
     /**
      * PII 삭제 요청 생성
      */
-    createDeletionRequest(requestId, userPhone, userEmail, userId, userIp, dataTypes = [], reason = 'user_request', priority = 'normal') {
+    createDeletionRequest(requestId, userPhone, userEmail, userId, userIp, dataTypes = [], reason = "user_request", priority = "normal") {
         const id = this.generateRequestId();
         // 감사 로그 기록
-        const auditEventId = (0, audit_1.logPiiDeletionRequest)(requestId, userId || 'anonymous', userPhone || 'unknown', userIp, dataTypes.join(','), reason);
+        const auditEventId = (0, audit_1.logPiiDeletionRequest)(requestId, userId || "anonymous", userPhone || "unknown", userIp, dataTypes.join(","), reason);
         const deletionRequest = {
             id,
             requestId,
@@ -131,27 +131,27 @@ class PiiManager {
             userPhone,
             userEmail,
             userIp,
-            requestType: 'deletion',
+            requestType: "deletion",
             dataTypes: dataTypes.length > 0 ? dataTypes : this.getAllDataTypes(),
             reason,
             legalBasis: this.getLegalBasis(reason),
-            status: 'pending',
+            status: "pending",
             priority,
             requestedAt: new Date(),
             successCount: 0,
             failureCount: 0,
             totalDataLocations: 0,
-            auditEventId
+            auditEventId,
         };
         this.deletionRequests.set(id, deletionRequest);
         // 콘솔에 삭제 요청 로그 (개발 환경)
-        if (process.env.NODE_ENV === 'development') {
-            console.log('[PII] Deletion request created:', {
+        if (process.env.NODE_ENV === "development") {
+            console.log("[PII] Deletion request created:", {
                 id,
-                userPhone: userPhone ? this.maskPhone(userPhone) : 'unknown',
+                userPhone: userPhone ? this.maskPhone(userPhone) : "unknown",
                 dataTypes: deletionRequest.dataTypes,
                 reason,
-                priority
+                priority,
             });
         }
         return deletionRequest;
@@ -164,12 +164,12 @@ class PiiManager {
         if (!request) {
             throw new Error(`Deletion request not found: ${requestId}`);
         }
-        if (request.status !== 'pending') {
+        if (request.status !== "pending") {
             throw new Error(`Request is not pending: ${request.status}`);
         }
         // 상태를 처리 중으로 변경
-        request.status = 'processing';
-        request.processedBy = 'system';
+        request.status = "processing";
+        request.processedBy = "system";
         const startTime = Date.now();
         let successCount = 0;
         let failureCount = 0;
@@ -199,7 +199,7 @@ class PiiManager {
                 }
             }
             // 요청 완료 처리
-            request.status = 'completed';
+            request.status = "completed";
             request.processedAt = new Date();
             request.successCount = successCount;
             request.failureCount = failureCount;
@@ -211,24 +211,24 @@ class PiiManager {
                 successCount,
                 failureCount,
                 totalLocations,
-                processingTime: `${processingTime}ms`
+                processingTime: `${processingTime}ms`,
             });
             return {
                 success: true,
-                message: 'PII deletion completed successfully',
+                message: "PII deletion completed successfully",
                 details: {
                     successCount,
                     failureCount,
                     totalLocations,
-                    processingTime
-                }
+                    processingTime,
+                },
             };
         }
         catch (error) {
             // 실패 처리
-            request.status = 'failed';
+            request.status = "failed";
             request.processedAt = new Date();
-            request.processingNotes = `Failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            request.processingNotes = `Failed: ${error instanceof Error ? error.message : "Unknown error"}`;
             console.error(`[PII] Deletion request ${requestId} failed:`, error);
             throw error;
         }
@@ -241,7 +241,7 @@ class PiiManager {
             // 🚨 실제 구현에서는 여기에 데이터베이스 삭제 쿼리를 실행
             // 예시: DELETE FROM ${location.table} WHERE ${location.identifierField} = ?
             // 시뮬레이션을 위한 지연
-            await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+            await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
             // 성공률 95%로 시뮬레이션
             const success = Math.random() > 0.05;
             if (success) {
@@ -273,15 +273,15 @@ class PiiManager {
             oldValue,
             newValue,
             reason,
-            status: 'pending',
-            requestedAt: new Date()
+            status: "pending",
+            requestedAt: new Date(),
         };
         this.correctionRequests.set(id, correctionRequest);
-        console.log('[PII] Correction request created:', {
+        console.log("[PII] Correction request created:", {
             id,
             userId,
             fieldName,
-            reason
+            reason,
         });
         return correctionRequest;
     }
@@ -296,12 +296,12 @@ class PiiManager {
         request.status = status;
         request.approvedBy = processedBy;
         request.approvedAt = new Date();
-        if (status === 'rejected' && rejectionReason) {
+        if (status === "rejected" && rejectionReason) {
             request.rejectionReason = rejectionReason;
         }
         console.log(`[PII] Correction request ${requestId} ${status}:`, {
             processedBy,
-            rejectionReason
+            rejectionReason,
         });
         return request;
     }
@@ -311,14 +311,14 @@ class PiiManager {
      */
     getIdentifierValue(request, fieldName) {
         switch (fieldName) {
-            case 'phone':
-                return request.userPhone || 'unknown';
-            case 'email':
-                return request.userEmail || 'unknown';
-            case 'user_id':
-                return request.userId || 'unknown';
+            case "phone":
+                return request.userPhone || "unknown";
+            case "email":
+                return request.userEmail || "unknown";
+            case "user_id":
+                return request.userId || "unknown";
             default:
-                return 'unknown';
+                return "unknown";
         }
     }
     /**
@@ -326,16 +326,16 @@ class PiiManager {
      */
     getLegalBasis(reason) {
         switch (reason) {
-            case 'user_request':
-                return '개인정보보호법 제17조 (개인정보의 삭제)';
-            case 'legal_requirement':
-                return '개인정보보호법 제17조 (법적 요구사항)';
-            case 'retention_expired':
-                return '개인정보보호법 제15조 (보존기간 만료)';
-            case 'data_breach':
-                return '개인정보보호법 제34조 (개인정보 유출사고 대응)';
+            case "user_request":
+                return "개인정보보호법 제17조 (개인정보의 삭제)";
+            case "legal_requirement":
+                return "개인정보보호법 제17조 (법적 요구사항)";
+            case "retention_expired":
+                return "개인정보보호법 제15조 (보존기간 만료)";
+            case "data_breach":
+                return "개인정보보호법 제34조 (개인정보 유출사고 대응)";
             default:
-                return '개인정보보호법';
+                return "개인정보보호법";
         }
     }
     /**
@@ -348,32 +348,32 @@ class PiiManager {
      * 고유 요청 ID 생성
      */
     generateRequestId() {
-        return `pii_${Date.now()}_${crypto_1.default.randomBytes(8).toString('hex')}`;
+        return `pii_${Date.now()}_${crypto_1.default.randomBytes(8).toString("hex")}`;
     }
     /**
      * 전화번호 마스킹
      */
     maskPhone(phone) {
-        if (!phone || phone === 'unknown')
-            return 'unknown';
-        return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+        if (!phone || phone === "unknown")
+            return "unknown";
+        return phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
     }
     /**
      * 식별자 마스킹
      */
     maskIdentifier(identifier) {
-        if (!identifier || identifier === 'unknown')
-            return 'unknown';
-        if (identifier.includes('@')) {
+        if (!identifier || identifier === "unknown")
+            return "unknown";
+        if (identifier.includes("@")) {
             // 이메일 마스킹
-            const [local, domain] = identifier.split('@');
+            const [local, domain] = identifier.split("@");
             return `${local.charAt(0)}***@${domain.charAt(0)}***.com`;
         }
         else if (identifier.length > 4) {
             // 전화번호나 ID 마스킹
             return `${identifier.substring(0, 2)}***${identifier.substring(identifier.length - 2)}`;
         }
-        return '***';
+        return "***";
     }
     // ===== 공개 메서드들 =====
     /**
@@ -392,8 +392,7 @@ class PiiManager {
      * 사용자별 삭제 요청 조회
      */
     getDeletionRequestsByUser(userId) {
-        return Array.from(this.deletionRequests.values())
-            .filter(request => request.userId === userId);
+        return Array.from(this.deletionRequests.values()).filter((request) => request.userId === userId);
     }
     /**
      * 수정 요청 조회
@@ -423,20 +422,23 @@ class PiiManager {
         return {
             deletionRequests: {
                 total: this.deletionRequests.size,
-                pending: Array.from(this.deletionRequests.values()).filter(r => r.status === 'pending').length,
-                processing: Array.from(this.deletionRequests.values()).filter(r => r.status === 'processing').length,
-                completed: Array.from(this.deletionRequests.values()).filter(r => r.status === 'completed').length,
-                failed: Array.from(this.deletionRequests.values()).filter(r => r.status === 'failed').length
+                pending: Array.from(this.deletionRequests.values()).filter((r) => r.status === "pending")
+                    .length,
+                processing: Array.from(this.deletionRequests.values()).filter((r) => r.status === "processing").length,
+                completed: Array.from(this.deletionRequests.values()).filter((r) => r.status === "completed").length,
+                failed: Array.from(this.deletionRequests.values()).filter((r) => r.status === "failed")
+                    .length,
             },
             correctionRequests: {
                 total: this.correctionRequests.size,
-                pending: Array.from(this.correctionRequests.values()).filter(r => r.status === 'pending').length,
-                approved: Array.from(this.correctionRequests.values()).filter(r => r.status === 'approved').length,
-                rejected: Array.from(this.correctionRequests.values()).filter(r => r.status === 'rejected').length
+                pending: Array.from(this.correctionRequests.values()).filter((r) => r.status === "pending")
+                    .length,
+                approved: Array.from(this.correctionRequests.values()).filter((r) => r.status === "approved").length,
+                rejected: Array.from(this.correctionRequests.values()).filter((r) => r.status === "rejected").length,
             },
             dataTypes: Array.from(this.dataLocations.keys()),
             environment: process.env.NODE_ENV,
-            version: process.env.npm_package_version
+            version: process.env.npm_package_version,
         };
     }
     /**
@@ -457,7 +459,7 @@ exports.piiManager = PiiManager.getInstance();
  * PII 삭제 요청 생성 (간편 함수)
  */
 function createPiiDeletionRequest(requestId, userPhone, userEmail, userId, userIp, dataTypes, reason, priority) {
-    return exports.piiManager.createDeletionRequest(requestId, userPhone, userEmail, userId, userIp, dataTypes || [], reason || 'user_request', priority || 'normal');
+    return exports.piiManager.createDeletionRequest(requestId, userPhone, userEmail, userId, userIp, dataTypes || [], reason || "user_request", priority || "normal");
 }
 /**
  * PII 삭제 요청 처리 (간편 함수)
@@ -472,4 +474,4 @@ function createPiiCorrectionRequest(requestId, userId, userPhone, userIp, fieldN
     return exports.piiManager.createCorrectionRequest(requestId, userId, userPhone, userIp, fieldName, oldValue, newValue, reason);
 }
 // ===== 초기화 완료 로그 =====
-console.log('[PII] PII management system initialized:', exports.piiManager.getStatus());
+console.log("[PII] PII management system initialized:", exports.piiManager.getStatus());

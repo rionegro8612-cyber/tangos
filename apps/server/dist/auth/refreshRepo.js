@@ -11,7 +11,7 @@ const crypto_1 = __importDefault(require("crypto"));
 const sha256hex = (s) => crypto_1.default.createHash("sha256").update(s).digest("hex");
 async function storeRefresh(userId, token, expiresAtISO, ua, ip) {
     // 임시로 테이블이 없으므로 로그만 출력
-    console.log('[AUTH_REFRESH] 저장 시도:', { userId, expiresAtISO, ua, ip });
+    console.log("[AUTH_REFRESH] 저장 시도:", { userId, expiresAtISO, ua, ip });
     // TODO: auth_refresh_tokens 테이블 생성 후 활성화
     // const hash = sha256hex(token);
     // await query(
@@ -22,7 +22,7 @@ async function storeRefresh(userId, token, expiresAtISO, ua, ip) {
 }
 async function revokeRefresh(token) {
     // 임시로 테이블이 없으므로 로그만 출력
-    console.log('[AUTH_REFRESH] 폐기 시도:', { token: token.substring(0, 10) + '...' });
+    console.log("[AUTH_REFRESH] 폐기 시도:", { token: token.substring(0, 10) + "..." });
     // TODO: auth_refresh_tokens 테이블 생성 후 활성화
     // const hash = sha256hex(token);
     // await query(
@@ -35,7 +35,10 @@ async function revokeRefresh(token) {
 }
 async function isRefreshValid(userId, token) {
     // 임시로 테이블이 없으므로 false 반환
-    console.log('[AUTH_REFRESH] 유효성 검사 시도:', { userId, token: token.substring(0, 10) + '...' });
+    console.log("[AUTH_REFRESH] 유효성 검사 시도:", {
+        userId,
+        token: token.substring(0, 10) + "...",
+    });
     return false;
     // TODO: auth_refresh_tokens 테이블 생성 후 활성화
     // const hash = sha256hex(token);
@@ -52,7 +55,7 @@ async function isRefreshValid(userId, token) {
 }
 async function replaceRefresh(userId, oldToken, newToken, expIso, userAgent, ip) {
     // 임시로 테이블이 없으므로 로그만 출력하고 true 반환
-    console.log('[AUTH_REFRESH] 교체 시도:', { userId, expIso, userAgent, ip });
+    console.log("[AUTH_REFRESH] 교체 시도:", { userId, expIso, userAgent, ip });
     return true;
     // TODO: auth_refresh_tokens 테이블 생성 후 활성화
     // const oldHash = sha256hex(oldToken);

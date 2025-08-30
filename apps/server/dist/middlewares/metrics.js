@@ -15,7 +15,7 @@ function metricsMiddleware(req, res, next) {
     // 요청 시작 시간 기록
     const timer = (0, metrics_1.startHttpRequestTimer)(req.method, req.route?.path || req.path, getEndpointFromPath(req.path));
     // 요청 완료 시 메트릭 업데이트
-    res.on('finish', () => {
+    res.on("finish", () => {
         (0, metrics_1.endHttpRequestTimer)(timer, res.statusCode);
     });
     next();
@@ -26,13 +26,13 @@ function metricsMiddleware(req, res, next) {
  */
 function getEndpointFromPath(path) {
     if (!path)
-        return 'unknown';
+        return "unknown";
     // /api/v1/auth/send-sms → auth_send_sms
     const parts = path
-        .split('/')
-        .filter(part => part && part !== 'api' && part !== 'v1')
-        .join('_');
-    return parts || 'root';
+        .split("/")
+        .filter((part) => part && part !== "api" && part !== "v1")
+        .join("_");
+    return parts || "root";
 }
 /**
  * 라우트별 메트릭 라벨 생성
@@ -42,8 +42,8 @@ function getRouteLabel(req) {
         return req.route.path;
     }
     // 동적 라우트 처리 (예: /users/:id → /users/:id)
-    if (req.path.includes('/:')) {
-        return req.path.replace(/\/:[^/]+/g, '/:param');
+    if (req.path.includes("/:")) {
+        return req.path.replace(/\/:[^/]+/g, "/:param");
     }
     return req.path;
 }
@@ -53,13 +53,13 @@ function getRouteLabel(req) {
  */
 function getStatusGroup(statusCode) {
     if (statusCode >= 200 && statusCode < 300)
-        return '2xx';
+        return "2xx";
     if (statusCode >= 300 && statusCode < 400)
-        return '3xx';
+        return "3xx";
     if (statusCode >= 400 && statusCode < 500)
-        return '4xx';
+        return "4xx";
     if (statusCode >= 500 && statusCode < 600)
-        return '5xx';
-    return 'unknown';
+        return "5xx";
+    return "unknown";
 }
 exports.default = metricsMiddleware;

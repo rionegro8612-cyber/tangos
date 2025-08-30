@@ -9,7 +9,7 @@ exports.refreshRouter.post("/refresh", async (req, res) => {
     if (!rt)
         return res.fail("AUTH_NO_RT", "리프레시 토큰이 없습니다.", 401);
     // 임시로 테이블이 없으므로 간단히 로그인 재요청 처리
-    console.log('[REFRESH] 리프레시 토큰 요청 - 테이블 없음으로 인한 재로그인 요청');
+    console.log("[REFRESH] 리프레시 토큰 요청 - 테이블 없음으로 인한 재로그인 요청");
     (0, cookies_1.clearAuthCookies)(res);
     return res.fail("AUTH_RT_REUSE", "세션 재인증이 필요합니다.", 401);
     // TODO: refresh_tokens 테이블 생성 후 다음 코드 활성화

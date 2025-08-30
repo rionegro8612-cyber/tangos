@@ -20,6 +20,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "cross-env NODE_ENV=test jest --runInBand --passWithNoTests --detectOpenHandles",
+    "test:win-local": "cross-env NODE_ENV=test jest --runInBand --passWithNoTests --detectOpenHandles --forceExit --silent",
     "format:check": "prettier --check ."
   },
   "repository": {

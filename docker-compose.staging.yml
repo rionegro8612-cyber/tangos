@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # ===== 백엔드 서버 =====
+  server:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "4100:4100"
+    environment:
+      - NODE_ENV=staging
+      - PORT=4100
+      - DATABASE_URL=postgres://tango:tango123@postgres:5432/tango_staging
+      - POSTGRES_DB=tango_staging
+      - POSTGRES_USER=tango
+      - POSTGRES_PASSWORD=tango123
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_EXPIRES_MIN=30
+      - JWT_REFRESH_EXPIRES_DAYS=30
+      - JWT_SECRET=change_me_to_a_long_random_string
+      - AUTH_COOKIE=1
+      - COOKIE_SECURE=false
+      - COOKIE_SAMESITE=Lax
+      - FRONT_ORIGINS=http://localhost:3000,http://localhost:3001
+      - CORS_ORIGIN=http://localhost:3000
+      - OTP_CODE_TTL_SEC=180
+      - OTP_RESEND_COOLDOWN_SEC=60
+      - SMS_PROVIDER=twilio
+      - DEBUG_OTP=1
+      - TRUST_PROXY=0
+      - FORCE_HTTPS=false
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    networks:
+      - tango-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4100/api/v1/_ping || curl -fsS http://localhost:4100/api/v1/_ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ===== 데이터베이스 =====
+  postgres:
+    image: postgres:15-alpine
+    container_name: tango-postgres-staging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tango_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-tango}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tango123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+    networks:
+      - tango-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tango} -d ${POSTGRES_DB:-tango_staging}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===== Redis =====
+  redis:
+    image: redis:7-alpine
+    container_name: tango-redis-staging
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-staging-data:/data
+    networks:
+      - tango-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===== 프론트엔드 (선택사항) =====
+  web:
+    build:
+      context: ./tango-web
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=staging
+      - NEXT_PUBLIC_API_BASE=http://localhost:4100/api/v1
+      - NEXT_PUBLIC_APP_NAME=Tango
+    networks:
+      - tango-network
+    restart: unless-stopped
+    depends_on:
+      - server
+
+networks:
+  tango-network:
+    driver: bridge
+
+volumes:
+  postgres-staging-data:
+  redis-staging-data:

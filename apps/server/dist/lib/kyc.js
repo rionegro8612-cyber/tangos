@@ -26,12 +26,12 @@ function calculateAge(birthDate) {
  * PASS KYC 검증
  */
 async function verifyWithPass(request) {
-    const PASS_API_URL = process.env.PASS_API_URL || 'https://dev-api.sktelecom.com';
+    const PASS_API_URL = process.env.PASS_API_URL || "https://dev-api.sktelecom.com";
     const PASS_CLIENT_ID = process.env.PASS_CLIENT_ID;
     const PASS_CLIENT_SECRET = process.env.PASS_CLIENT_SECRET;
     if (!PASS_CLIENT_ID || !PASS_CLIENT_SECRET) {
-        console.warn('[KYC] PASS credentials not configured, using STUB');
-        return createStubResponse(request, 'PASS');
+        console.warn("[KYC] PASS credentials not configured, using STUB");
+        return createStubResponse(request, "PASS");
     }
     try {
         // PASS API 호출 (실제 구현 시)
@@ -41,10 +41,10 @@ async function verifyWithPass(request) {
             name: request.name,
             birthDate: request.birthDate,
             phoneNumber: request.phoneNumber,
-            carrier: request.carrier
+            carrier: request.carrier,
         });
         if (!response.success) {
-            throw errorCodes_1.createError.externalApiError('PASS KYC', response);
+            throw errorCodes_1.createError.externalApiError("PASS KYC", response);
         }
         const age = calculateAge(request.birthDate);
         // 50세 미만 제한
@@ -53,42 +53,42 @@ async function verifyWithPass(request) {
         }
         return {
             success: true,
-            provider: 'PASS',
+            provider: "PASS",
             verified: true,
             data: {
                 name: request.name,
                 birthDate: request.birthDate,
                 age,
                 phoneNumber: request.phoneNumber,
-                ci: response.data?.ci || 'mock_ci_from_pass',
-                di: response.data?.di || 'mock_di_from_pass',
-                carrier: request.carrier
-            }
+                ci: response.data?.ci || "mock_ci_from_pass",
+                di: response.data?.di || "mock_di_from_pass",
+                carrier: request.carrier,
+            },
         };
     }
     catch (error) {
         if (error instanceof errorCodes_1.StandardError) {
             throw error;
         }
-        throw errorCodes_1.createError.externalApiError('PASS KYC', error);
+        throw errorCodes_1.createError.externalApiError("PASS KYC", error);
     }
 }
 /**
  * NICE KYC 검증
  */
 async function verifyWithNice(request) {
-    const NICE_API_URL = process.env.NICE_API_URL || 'https://svc.niceapi.co.kr';
+    const NICE_API_URL = process.env.NICE_API_URL || "https://svc.niceapi.co.kr";
     const NICE_CLIENT_ID = process.env.NICE_CLIENT_ID;
     const NICE_CLIENT_SECRET = process.env.NICE_CLIENT_SECRET;
     if (!NICE_CLIENT_ID || !NICE_CLIENT_SECRET) {
-        console.warn('[KYC] NICE credentials not configured, using STUB');
-        return createStubResponse(request, 'NICE');
+        console.warn("[KYC] NICE credentials not configured, using STUB");
+        return createStubResponse(request, "NICE");
     }
     try {
         // NICE API 호출 (실제 구현 시)
         const response = await httpClient_1.kycClient.post(`${NICE_API_URL}/digital/niceid/api/v1.0/common/crypto/token`, {
             dataHeader: {
-                CNTY_CD: 'ko'
+                CNTY_CD: "ko",
             },
             dataBody: {
                 req_dtim: new Date().toISOString(),
@@ -96,17 +96,17 @@ async function verifyWithNice(request) {
                 enc_data: {
                     name: request.name,
                     birth_date: request.birthDate,
-                    phone_no: request.phoneNumber
-                }
-            }
+                    phone_no: request.phoneNumber,
+                },
+            },
         }, {
             headers: {
-                'client_id': NICE_CLIENT_ID,
-                'client_secret': NICE_CLIENT_SECRET
-            }
+                client_id: NICE_CLIENT_ID,
+                client_secret: NICE_CLIENT_SECRET,
+            },
         });
         if (!response.success) {
-            throw errorCodes_1.createError.externalApiError('NICE KYC', response);
+            throw errorCodes_1.createError.externalApiError("NICE KYC", response);
         }
         const age = calculateAge(request.birthDate);
         // 50세 미만 제한
@@ -115,24 +115,24 @@ async function verifyWithNice(request) {
         }
         return {
             success: true,
-            provider: 'NICE',
+            provider: "NICE",
             verified: true,
             data: {
                 name: request.name,
                 birthDate: request.birthDate,
                 age,
                 phoneNumber: request.phoneNumber,
-                ci: response.data?.ci || 'mock_ci_from_nice',
-                di: response.data?.di || 'mock_di_from_nice',
-                carrier: request.carrier
-            }
+                ci: response.data?.ci || "mock_ci_from_nice",
+                di: response.data?.di || "mock_di_from_nice",
+                carrier: request.carrier,
+            },
         };
     }
     catch (error) {
         if (error instanceof errorCodes_1.StandardError) {
             throw error;
         }
-        throw errorCodes_1.createError.externalApiError('NICE KYC', error);
+        throw errorCodes_1.createError.externalApiError("NICE KYC", error);
     }
 }
 /**
@@ -141,14 +141,14 @@ async function verifyWithNice(request) {
 function createStubResponse(request, provider) {
     const age = calculateAge(request.birthDate);
     // 개발환경에서는 특정 케이스 테스트 가능
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
         // 테스트 케이스: 나이 제한
-        if (request.name === '김영수' || age < 50) {
+        if (request.name === "김영수" || age < 50) {
             throw errorCodes_1.createError.kycAgeFailed(age);
         }
         // 테스트 케이스: 정보 불일치
-        if (request.name === '이불일치') {
-            throw errorCodes_1.createError.kycMismatch('입력한 정보가 일치하지 않습니다');
+        if (request.name === "이불일치") {
+            throw errorCodes_1.createError.kycMismatch("입력한 정보가 일치하지 않습니다");
         }
     }
     return {
@@ -162,8 +162,8 @@ function createStubResponse(request, provider) {
             phoneNumber: request.phoneNumber,
             ci: `stub_ci_${provider.toLowerCase()}_${Date.now()}`,
             di: `stub_di_${provider.toLowerCase()}_${Date.now()}`,
-            carrier: request.carrier
-        }
+            carrier: request.carrier,
+        },
     };
 }
 /**
@@ -182,7 +182,7 @@ async function verifyKyc(request) {
         console.warn(`[KYC] PASS verification failed for ${request.name}:`, passError);
         // PASS에서 나이 제한이나 정보 불일치 등 비즈니스 에러인 경우 NICE로 전환하지 않음
         if (passError instanceof errorCodes_1.StandardError &&
-            (passError.code === 'KYC_AGE_RESTRICTION' || passError.code === 'KYC_INFO_MISMATCH')) {
+            (passError.code === "KYC_AGE_RESTRICTION" || passError.code === "KYC_INFO_MISMATCH")) {
             throw passError;
         }
         try {
@@ -199,7 +199,7 @@ async function verifyKyc(request) {
                 throw niceError;
             }
             // 둘 다 실패한 경우 일반적인 KYC 실패 에러
-            throw new errorCodes_1.StandardError('KYC_VERIFICATION_FAILED', 'KYC 검증에 실패했습니다');
+            throw new errorCodes_1.StandardError("KYC_VERIFICATION_FAILED", "KYC 검증에 실패했습니다");
         }
     }
 }

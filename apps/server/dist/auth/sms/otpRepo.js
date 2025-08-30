@@ -6,8 +6,12 @@ const db_1 = require("../../db");
 const otpUtil_1 = require("./otpUtil");
 const crypto_1 = require("crypto");
 function isDevOtpOn() {
-    const providerIsMock = String(process.env.SMS_PROVIDER || "").trim().toLowerCase() === "mock";
-    const debugOtpOn = ["1", "true", "yes", "on"].includes(String(process.env.DEBUG_OTP ?? "").trim().toLowerCase());
+    const providerIsMock = String(process.env.SMS_PROVIDER || "")
+        .trim()
+        .toLowerCase() === "mock";
+    const debugOtpOn = ["1", "true", "yes", "on"].includes(String(process.env.DEBUG_OTP ?? "")
+        .trim()
+        .toLowerCase());
     return providerIsMock || debugOtpOn;
 }
 async function issueCode(rawPhone, opts) {
@@ -31,7 +35,9 @@ async function issueCode(rawPhone, opts) {
     }
     // 안전한 난수로 OTP 생성
     const len = Math.min(Math.max(Number(process.env.OTP_CODE_LEN ?? 6), 4), 8); // 4~8자리
-    const code = (0, crypto_1.randomInt)(0, 10 ** len).toString().padStart(len, "0");
+    const code = (0, crypto_1.randomInt)(0, 10 ** len)
+        .toString()
+        .padStart(len, "0");
     const salt = (0, otpUtil_1.newSalt)();
     const hash = (0, otpUtil_1.hashCode)(code, salt);
     const ttlSec = Number(process.env.OTP_CODE_TTL_SEC ?? 180);
@@ -40,7 +46,7 @@ async function issueCode(rawPhone, opts) {
      RETURNING id, request_id, expire_at`, [phone, `${hash}:${salt}`, String(ttlSec)]);
     const row = rows[0];
     // mock/DEBUG_OTP 또는 forceDev면 평문 코드 동봉
-    const _codeForDev = (opts?.forceDev || isDevOtpOn()) ? code : undefined;
+    const _codeForDev = opts?.forceDev || isDevOtpOn() ? code : undefined;
     return {
         ok: true,
         phoneE164: phone,

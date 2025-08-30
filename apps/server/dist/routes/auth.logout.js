@@ -13,7 +13,9 @@ exports.logoutRouter.post("/logout", async (req, res) => {
             const payload = (0, jwt_1.verifyRefreshToken)(rt);
             await (0, refreshTokenRepo_1.revokeJti)(payload.jti);
         }
-        catch { /* ignore */ }
+        catch {
+            /* ignore */
+        }
     }
     (0, cookies_1.clearAuthCookies)(res);
     return res.ok({ loggedOut: true }, "OK");

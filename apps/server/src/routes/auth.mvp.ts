@@ -8,7 +8,7 @@ import {
   touchLastLogin,
   findByPhone,
 } from "../repos/userRepo";
-import { signAccessToken, verifyAccessToken, newJti } from "../lib/jwt";
+import { signAccessToken, signRefreshToken, verifyAccessToken, newJti } from "../lib/jwt";
 import {
   setOtp,
   getOtp,
@@ -31,6 +31,7 @@ import {
 import { rateLimitSend, rateLimitVerify } from "../middlewares/rateLimit";
 import { withIdempotency } from "../middlewares/idempotency";
 import { checkAndMarkCooldown, fetchOtp } from "../lib/otpService";
+import { setAuthCookies, accessCookieOptions } from "../lib/cookies";
 
 // 🆕 환경변수 상수 추가
 const TTL = readIntFromEnv("OTP_TTL", 300); // 5분
@@ -47,54 +48,13 @@ function phoneMasked(phone: string): string {
   return phone.slice(0, 3) + "*".repeat(phone.length - 4) + phone.slice(-1);
 }
 
+// 쿠키 관련 함수들은 lib/cookies.ts에서 import하여 사용
+
 /** Authorization: Bearer 또는 httpOnly cookie에서 access 토큰 추출 */
 function getTokenFromReq(req: Request) {
   const hdr = req.headers.authorization || "";
   const m = hdr.match(/^Bearer\s+(.+)$/i);
   return m?.[1] || (req.cookies?.access_token as string | undefined);
-}
-
-/** Access-Token 쿠키 옵션(프로덕션 모드 강화) */
-function accessCookieOptions() {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  // 보안 설정 (프로덕션에서는 강화)
-  const secure =
-    String(process.env.COOKIE_SECURE || (isProduction ? "true" : "false")).toLowerCase() === "true";
-  const domain = process.env.COOKIE_DOMAIN || undefined;
-  const maxMin = Number(process.env.JWT_ACCESS_EXPIRES_MIN || 30);
-
-  // SameSite 설정 (프로덕션에서는 환경변수 우선)
-  let sameSite: "lax" | "none" | "strict";
-  if (process.env.COOKIE_SAMESITE) {
-    const envSameSite = process.env.COOKIE_SAMESITE.toLowerCase();
-    if (envSameSite === "lax" || envSameSite === "none" || envSameSite === "strict") {
-      sameSite = envSameSite;
-    } else {
-      sameSite = "lax";
-    }
-  } else if (secure) {
-    // HTTPS에서는 none (크로스사이트 지원)
-    sameSite = "none";
-  } else {
-    // HTTP에서는 lax (보안과 호환성 균형)
-    sameSite = "lax";
-  }
-
-  // 프로덕션에서 SameSite=none일 때 secure=true 필수
-  if (sameSite === "none" && !secure) {
-    console.warn("[COOKIE] SameSite=none requires secure=true in production");
-    sameSite = "lax"; // 자동으로 lax로 변경
-  }
-
-  return {
-    httpOnly: true,
-    secure,
-    sameSite,
-    domain,
-    path: "/",
-    maxAge: maxMin * 60 * 1000,
-  };
 }
 
 /** POST /api/v1/auth/send-sms */
@@ -405,7 +365,25 @@ authRouter.post("/verify-code",
         }
       }
     } else {
-      console.log(`[DEBUG] 기존 사용자: ${phone}, 가입 티켓 생성 안함`);
+      console.log(`[DEBUG] 기존 사용자: ${phone}, 로그인 처리 시작`);
+      
+      // 기존 사용자 로그인 처리: 토큰 발급 및 쿠키 설정
+      try {
+        const user = await findByPhone(phone);
+        if (user) {
+          const jti = newJti();
+          const at = signAccessToken(user.id, jti);
+          const rt = signRefreshToken(user.id, jti);
+          
+          // 로그인 성공 시 쿠키 설정
+          setAuthCookies(res, at, rt);
+          
+          console.log(`[DEBUG] 로그인 성공: ${phone}, 토큰 발급 완료`);
+        }
+      } catch (error) {
+        console.error(`[ERROR] 로그인 처리 실패: ${phone}`, error);
+        // 로그인 실패 시에도 OTP 검증은 성공으로 처리
+      }
     }
 
     // 🆕 메트릭: OTP 검증 성공

@@ -44,7 +44,7 @@ router.post("/auth/register/start", (req, res, next) => {
             started: true,
             phone: req.body.phone,
             carrier: req.body.carrier,
-            ttlSec: 1800
+            ttlSec: 1800,
         },
         requestId: req.requestId ?? null,
     });
@@ -59,7 +59,7 @@ router.post("/auth/register/complete", (req, res, next) => {
         message: "REG_COMPLETE_OK (Deprecated)",
         data: {
             registered: true,
-            message: "Registration completed (Deprecated)"
+            message: "Registration completed (Deprecated)",
         },
         requestId: req.requestId ?? null,
     });

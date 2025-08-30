@@ -11,14 +11,14 @@ const errorCodes_1 = require("./errorCodes");
  */
 function wrapExternalResponse(response, serviceName) {
     // 이미 StandardResponse 형태인 경우
-    if (response && typeof response === 'object' && 'success' in response) {
+    if (response && typeof response === "object" && "success" in response) {
         return response;
     }
     // 외부 API 응답을 표준 형태로 래핑
     return {
         success: true,
         data: response,
-        message: `${serviceName} API response`
+        message: `${serviceName} API response`,
     };
 }
 /**
@@ -26,7 +26,7 @@ function wrapExternalResponse(response, serviceName) {
  */
 function isRetryableError(error) {
     // 네트워크 에러
-    if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    if (error.code === "ECONNRESET" || error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
         return true;
     }
     // HTTP 상태코드 기반 판단
@@ -48,7 +48,7 @@ function isRetryableError(error) {
  * 지연 함수
  */
 function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 /**
  * HTTP 클라이언트 클래스
@@ -60,10 +60,10 @@ class HttpClient {
             retries: 2,
             retryDelay: 1000,
             headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'TangoApp/1.0',
+                "Content-Type": "application/json",
+                "User-Agent": "TangoApp/1.0",
             },
-            ...config
+            ...config,
         };
     }
     /**
@@ -95,25 +95,25 @@ class HttpClient {
      * 실제 HTTP 요청 수행
      */
     async performRequest(url, config) {
-        const { method = 'GET', body, timeout = 3000, headers = {}, signal } = config;
+        const { method = "GET", body, timeout = 3000, headers = {}, signal } = config;
         // AbortController로 타임아웃 처리
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
         // 사용자가 제공한 signal과 타임아웃 signal 조합
         if (signal) {
-            signal.addEventListener('abort', () => controller.abort());
+            signal.addEventListener("abort", () => controller.abort());
         }
         try {
             const fetchConfig = {
                 method,
                 headers: {
                     ...this.config.headers,
-                    ...headers
+                    ...headers,
                 },
-                signal: controller.signal
+                signal: controller.signal,
             };
-            if (body && method !== 'GET') {
-                fetchConfig.body = typeof body === 'string' ? body : JSON.stringify(body);
+            if (body && method !== "GET") {
+                fetchConfig.body = typeof body === "string" ? body : JSON.stringify(body);
             }
             const response = await fetch(url, fetchConfig);
             clearTimeout(timeoutId);
@@ -130,7 +130,7 @@ class HttpClient {
                 throw errorCodes_1.createError.externalApiError(this.getServiceNameFromUrl(url), {
                     status: response.status,
                     statusText: response.statusText,
-                    data: errorData
+                    data: errorData,
                 });
             }
             // 응답 파싱
@@ -147,8 +147,8 @@ class HttpClient {
         catch (error) {
             clearTimeout(timeoutId);
             // AbortError (타임아웃)
-            if (error instanceof Error && error.name === 'AbortError') {
-                throw new errorCodes_1.StandardError('KYC_API_TIMEOUT', `Request timeout (${timeout}ms): ${url}`);
+            if (error instanceof Error && error.name === "AbortError") {
+                throw new errorCodes_1.StandardError("KYC_API_TIMEOUT", `Request timeout (${timeout}ms): ${url}`);
             }
             // StandardError는 그대로 전파
             if (error instanceof errorCodes_1.StandardError) {
@@ -156,8 +156,8 @@ class HttpClient {
             }
             // 기타 네트워크 에러
             throw errorCodes_1.createError.externalApiError(this.getServiceNameFromUrl(url), {
-                message: error instanceof Error ? error.message : 'Unknown network error',
-                code: error?.code
+                message: error instanceof Error ? error.message : "Unknown network error",
+                code: error?.code,
             });
         }
     }
@@ -170,32 +170,32 @@ class HttpClient {
             return urlObj.hostname;
         }
         catch {
-            return 'External API';
+            return "External API";
         }
     }
     /**
      * GET 요청
      */
     async get(url, config) {
-        return this.request(url, { ...config, method: 'GET' });
+        return this.request(url, { ...config, method: "GET" });
     }
     /**
      * POST 요청
      */
     async post(url, body, config) {
-        return this.request(url, { ...config, method: 'POST', body });
+        return this.request(url, { ...config, method: "POST", body });
     }
     /**
      * PUT 요청
      */
     async put(url, body, config) {
-        return this.request(url, { ...config, method: 'PUT', body });
+        return this.request(url, { ...config, method: "PUT", body });
     }
     /**
      * DELETE 요청
      */
     async delete(url, config) {
-        return this.request(url, { ...config, method: 'DELETE' });
+        return this.request(url, { ...config, method: "DELETE" });
     }
 }
 exports.HttpClient = HttpClient;
@@ -207,15 +207,15 @@ exports.httpClient = new HttpClient();
 // 지도 API용 클라이언트 (5초 타임아웃)
 exports.mapClient = new HttpClient({
     timeout: 5000,
-    retries: 1
+    retries: 1,
 });
 // KYC API용 클라이언트 (10초 타임아웃, 재시도 없음)
 exports.kycClient = new HttpClient({
     timeout: 10000,
-    retries: 0
+    retries: 0,
 });
 // SMS API용 클라이언트 (5초 타임아웃)
 exports.smsClient = new HttpClient({
     timeout: 5000,
-    retries: 1
+    retries: 1,
 });

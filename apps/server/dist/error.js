@@ -5,8 +5,8 @@ function errorHandler(err, req, res, next) {
     console.error(err);
     res.status(500).json({
         success: false,
-        code: 'SERVER_ERROR',
+        code: "SERVER_ERROR",
         message: err.message,
-        requestId: req.requestId
+        requestId: req.requestId,
     });
 }

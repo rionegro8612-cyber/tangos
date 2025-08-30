@@ -9,7 +9,7 @@ const redis_1 = require("redis");
 const dayjs_1 = __importDefault(require("dayjs"));
 // Redis 클라이언트
 const redis = (0, redis_1.createClient)({
-    url: process.env.REDIS_URL || "redis://redis:6379"
+    url: process.env.REDIS_URL || "redis://redis:6379",
 });
 exports.registerRouter = (0, express_1.Router)();
 // KYC 최소 나이 제한
@@ -33,7 +33,7 @@ exports.registerRouter.post("/start", async (req, res) => {
             phone,
             carrier,
             startedAt: new Date().toISOString(),
-            status: 'started'
+            status: "started",
         };
         await redis.setex(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
         // 2) { requestId, ttlSec } 등 표준 응답
@@ -45,7 +45,7 @@ exports.registerRouter.post("/start", async (req, res) => {
                 started: true,
                 phone,
                 carrier,
-                ttlSec: 1800
+                ttlSec: 1800,
             },
             requestId: req.requestId ?? null,
         });
@@ -92,11 +92,30 @@ exports.registerRouter.post("/verify", async (req, res) => {
             const session = JSON.parse(sessionData);
             session.phoneVerified = true;
             session.verifiedAt = new Date().toISOString();
-            session.status = 'verified';
+            session.status = "verified";
             await redis.setex(sessionKey, 1800, JSON.stringify(session));
         }
         // OTP 코드 삭제
         await redis.del(phone);
+        // 🚨 회원가입 티켓 생성 (register.submit에서 필요)
+        const ticketKey = `reg:ticket:${phone}`;
+        const ticketData = {
+            phone,
+            verifiedAt: new Date().toISOString(),
+            context,
+            status: "verified"
+        };
+        console.log(`[DEBUG] 가입 티켓 생성 시도: ${ticketKey}`, ticketData);
+        try {
+            await redis.setex(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
+            console.log(`[DEBUG] 가입 티켓 생성 성공: ${ticketKey}`);
+            // 생성 확인
+            const verifyTicket = await redis.get(ticketKey);
+            console.log(`[DEBUG] 티켓 생성 확인: ${ticketKey} = ${verifyTicket ? '존재' : '없음'}`);
+        }
+        catch (error) {
+            console.error(`[ERROR] 티켓 생성 실패: ${ticketKey}`, error);
+        }
         // 2) { verified: true } 응답
         return res.json({
             success: true,
@@ -105,7 +124,7 @@ exports.registerRouter.post("/verify", async (req, res) => {
             data: {
                 verified: true,
                 phone,
-                context
+                context,
             },
             requestId: req.requestId ?? null,
         });
@@ -185,7 +204,7 @@ exports.registerRouter.post("/complete", async (req, res) => {
                 code: "TERMS_REQUIRED",
                 message: "필수 약관에 동의해주세요.",
                 data: {
-                    code: requiredNotAccepted.code
+                    code: requiredNotAccepted.code,
                 },
                 requestId: req.requestId ?? null,
             });
@@ -198,7 +217,7 @@ exports.registerRouter.post("/complete", async (req, res) => {
             birthYear: profile.birthYear,
             region: profile.region,
             age: age,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
         };
         // 4) signup_sessions 정리
         await redis.del(sessionKey);
@@ -209,7 +228,7 @@ exports.registerRouter.post("/complete", async (req, res) => {
             message: "REG_COMPLETE_OK",
             data: {
                 registered: true,
-                user: user
+                user: user,
             },
             requestId: req.requestId ?? null,
         });

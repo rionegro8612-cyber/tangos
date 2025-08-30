@@ -14,11 +14,11 @@ exports.reloadSecrets = reloadSecrets;
  * 환경별 시크릿 로드
  */
 async function loadSecrets() {
-    const env = process.env.NODE_ENV || 'development';
-    if (env === 'production') {
+    const env = process.env.NODE_ENV || "development";
+    if (env === "production") {
         return await loadProductionSecrets();
     }
-    else if (env === 'staging') {
+    else if (env === "staging") {
         return await loadStagingSecrets();
     }
     else {
@@ -31,38 +31,50 @@ async function loadSecrets() {
 function loadDevelopmentSecrets() {
     return {
         sms: {
-            sens: process.env.SENS_ACCESS_KEY ? {
-                accessKey: process.env.SENS_ACCESS_KEY,
-                secretKey: process.env.SENS_SECRET_KEY || '',
-                serviceId: process.env.SENS_SERVICE_ID || ''
-            } : undefined,
-            nhn: process.env.NHN_ACCESS_KEY ? {
-                accessKey: process.env.NHN_ACCESS_KEY,
-                secretKey: process.env.NHN_SECRET_KEY || '',
-                serviceId: process.env.NHN_SERVICE_ID || ''
-            } : undefined
+            sens: process.env.SENS_ACCESS_KEY
+                ? {
+                    accessKey: process.env.SENS_ACCESS_KEY,
+                    secretKey: process.env.SENS_SECRET_KEY || "",
+                    serviceId: process.env.SENS_SERVICE_ID || "",
+                }
+                : undefined,
+            nhn: process.env.NHN_ACCESS_KEY
+                ? {
+                    accessKey: process.env.NHN_ACCESS_KEY,
+                    secretKey: process.env.NHN_SECRET_KEY || "",
+                    serviceId: process.env.NHN_SERVICE_ID || "",
+                }
+                : undefined,
         },
         kyc: {
-            pass: process.env.PASS_CLIENT_ID ? {
-                apiUrl: process.env.PASS_API_URL || 'https://dev-api.sktelecom.com',
-                clientId: process.env.PASS_CLIENT_ID,
-                clientSecret: process.env.PASS_CLIENT_SECRET || ''
-            } : undefined,
-            nice: process.env.NICE_CLIENT_ID ? {
-                apiUrl: process.env.NICE_API_URL || 'https://svc.niceapi.co.kr',
-                clientId: process.env.NICE_CLIENT_ID,
-                clientSecret: process.env.NICE_CLIENT_SECRET || ''
-            } : undefined
+            pass: process.env.PASS_CLIENT_ID
+                ? {
+                    apiUrl: process.env.PASS_API_URL || "https://dev-api.sktelecom.com",
+                    clientId: process.env.PASS_CLIENT_ID,
+                    clientSecret: process.env.PASS_CLIENT_SECRET || "",
+                }
+                : undefined,
+            nice: process.env.NICE_CLIENT_ID
+                ? {
+                    apiUrl: process.env.NICE_API_URL || "https://svc.niceapi.co.kr",
+                    clientId: process.env.NICE_CLIENT_ID,
+                    clientSecret: process.env.NICE_CLIENT_SECRET || "",
+                }
+                : undefined,
         },
         social: {
-            kakao: process.env.KAKAO_REST_API_KEY ? {
-                restApiKey: process.env.KAKAO_REST_API_KEY,
-                clientSecret: process.env.KAKAO_CLIENT_SECRET || ''
-            } : undefined,
-            vworld: process.env.VWORLD_API_KEY ? {
-                apiKey: process.env.VWORLD_API_KEY
-            } : undefined
-        }
+            kakao: process.env.KAKAO_REST_API_KEY
+                ? {
+                    restApiKey: process.env.KAKAO_REST_API_KEY,
+                    clientSecret: process.env.KAKAO_CLIENT_SECRET || "",
+                }
+                : undefined,
+            vworld: process.env.VWORLD_API_KEY
+                ? {
+                    apiKey: process.env.VWORLD_API_KEY,
+                }
+                : undefined,
+        },
     };
 }
 /**
@@ -71,22 +83,22 @@ function loadDevelopmentSecrets() {
 async function loadStagingSecrets() {
     try {
         // AWS Secrets Manager 연동 예시
-        if (process.env.AWS_SECRETS_ENABLED === 'true') {
-            return await loadFromAwsSecretsManager('tango-staging');
+        if (process.env.AWS_SECRETS_ENABLED === "true") {
+            return await loadFromAwsSecretsManager("tango-staging");
         }
         // GCP Secret Manager 연동 예시
-        if (process.env.GCP_SECRETS_ENABLED === 'true') {
-            return await loadFromGcpSecretManager('tango-staging');
+        if (process.env.GCP_SECRETS_ENABLED === "true") {
+            return await loadFromGcpSecretManager("tango-staging");
         }
         // Azure Key Vault 연동 예시
-        if (process.env.AZURE_SECRETS_ENABLED === 'true') {
-            return await loadFromAzureKeyVault('tango-staging');
+        if (process.env.AZURE_SECRETS_ENABLED === "true") {
+            return await loadFromAzureKeyVault("tango-staging");
         }
         // 기본값: 환경변수에서 로드 (스테이징용)
         return loadDevelopmentSecrets();
     }
     catch (error) {
-        console.error('[SECRETS] Failed to load staging secrets:', error);
+        console.error("[SECRETS] Failed to load staging secrets:", error);
         // 에러 시 개발환경 시크릿으로 fallback
         return loadDevelopmentSecrets();
     }
@@ -97,22 +109,22 @@ async function loadStagingSecrets() {
 async function loadProductionSecrets() {
     try {
         // AWS Secrets Manager 연동
-        if (process.env.AWS_SECRETS_ENABLED === 'true') {
-            return await loadFromAwsSecretsManager('tango-production');
+        if (process.env.AWS_SECRETS_ENABLED === "true") {
+            return await loadFromAwsSecretsManager("tango-production");
         }
         // GCP Secret Manager 연동
-        if (process.env.GCP_SECRETS_ENABLED === 'true') {
-            return await loadFromGcpSecretManager('tango-production');
+        if (process.env.GCP_SECRETS_ENABLED === "true") {
+            return await loadFromGcpSecretManager("tango-production");
         }
         // Azure Key Vault 연동
-        if (process.env.AZURE_SECRETS_ENABLED === 'true') {
-            return await loadFromAzureKeyVault('tango-production');
+        if (process.env.AZURE_SECRETS_ENABLED === "true") {
+            return await loadFromAzureKeyVault("tango-production");
         }
-        throw new Error('Production secrets must be loaded from Secrets Manager');
+        throw new Error("Production secrets must be loaded from Secrets Manager");
     }
     catch (error) {
-        console.error('[SECRETS] Failed to load production secrets:', error);
-        throw new Error('Critical: Cannot load production secrets');
+        console.error("[SECRETS] Failed to load production secrets:", error);
+        throw new Error("Critical: Cannot load production secrets");
     }
 }
 /**
@@ -125,7 +137,7 @@ async function loadFromAwsSecretsManager(secretName) {
     return {
         sms: {},
         kyc: {},
-        social: {}
+        social: {},
     };
 }
 /**
@@ -138,7 +150,7 @@ async function loadFromGcpSecretManager(secretName) {
     return {
         sms: {},
         kyc: {},
-        social: {}
+        social: {},
     };
 }
 /**
@@ -151,7 +163,7 @@ async function loadFromAzureKeyVault(secretName) {
     return {
         sms: {},
         kyc: {},
-        social: {}
+        social: {},
     };
 }
 /**
@@ -161,10 +173,10 @@ function validateSecrets(secrets) {
     const errors = [];
     // 필수 시크릿 검증
     if (!secrets.sms.sens && !secrets.sms.nhn) {
-        errors.push('SMS 서비스 설정이 필요합니다 (SENS 또는 NHN)');
+        errors.push("SMS 서비스 설정이 필요합니다 (SENS 또는 NHN)");
     }
     if (!secrets.kyc.pass && !secrets.kyc.nice) {
-        errors.push('KYC 서비스 설정이 필요합니다 (PASS 또는 NICE)');
+        errors.push("KYC 서비스 설정이 필요합니다 (PASS 또는 NICE)");
     }
     return errors;
 }
@@ -176,13 +188,13 @@ async function initializeSecrets() {
         const secrets = await loadSecrets();
         const errors = validateSecrets(secrets);
         if (errors.length > 0) {
-            console.warn('[SECRETS] Validation warnings:', errors);
+            console.warn("[SECRETS] Validation warnings:", errors);
         }
-        console.log('[SECRETS] Secrets loaded successfully');
+        console.log("[SECRETS] Secrets loaded successfully");
         return secrets;
     }
     catch (error) {
-        console.error('[SECRETS] Failed to initialize secrets:', error);
+        console.error("[SECRETS] Failed to initialize secrets:", error);
         throw error;
     }
 }

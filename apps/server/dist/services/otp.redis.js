@@ -10,7 +10,9 @@ exports.readIntFromEnv = readIntFromEnv;
 const redis_1 = require("../lib/redis");
 const memOTP = new Map();
 const memRL = new Map();
-function now() { return Date.now(); }
+function now() {
+    return Date.now();
+}
 function parseIntSafe(v, d) {
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
@@ -35,7 +37,7 @@ async function rlIncr(key, windowSec) {
     console.log(`[rate-limit] Memory fallback for ${key}:`, {
         existing: item ? { n: item.n, exp: item.exp, current: currentTime } : null,
         windowSec,
-        newExp: exp
+        newExp: exp,
     });
     if (!item || item.exp < currentTime) {
         // 새로운 윈도우 시작
@@ -68,7 +70,7 @@ async function getRateLimitInfo(key, limit, windowSec) {
                 limit,
                 remaining: Math.max(0, limit - n),
                 resetSec,
-                isExceeded: n > limit
+                isExceeded: n > limit,
             };
         }
     }
@@ -83,7 +85,7 @@ async function getRateLimitInfo(key, limit, windowSec) {
             limit,
             remaining: limit,
             resetSec: windowSec,
-            isExceeded: false
+            isExceeded: false,
         };
     }
     return {
@@ -91,7 +93,7 @@ async function getRateLimitInfo(key, limit, windowSec) {
         limit,
         remaining: Math.max(0, limit - item.n),
         resetSec: Math.ceil((item.exp - now()) / 1000),
-        isExceeded: item.n > limit
+        isExceeded: item.n > limit,
     };
 }
 async function setOtp(phone, code, ttlSec) {

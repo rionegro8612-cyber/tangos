@@ -70,7 +70,7 @@ exports.loginRouter.post("/send-sms", async (req, res) => {
         console.log(`[DEV] SMS to ${e164}: [Tango] 인증번호: ${code}`);
     }
     // 🆕 메트릭: OTP 전송 성공
-    (0, metrics_1.recordOtpSend)('success', 'MOCK', 'unknown');
+    (0, metrics_1.recordOtpSend)("success", "MOCK", "unknown");
     const devCode = process.env.NODE_ENV !== "production" ? code : undefined;
     return res.ok({ issued: true, ttlSec: 300, ...(devCode ? { devCode } : {}) }, "OK");
 });
@@ -83,11 +83,11 @@ exports.loginRouter.post("/verify-login", async (req, res) => {
     const ok = otp.verifyCode(e164, code, "login");
     if (!ok) {
         // 🆕 메트릭: OTP 검증 실패
-        (0, metrics_1.recordOtpVerify)('fail', 'INVALID_CODE');
+        (0, metrics_1.recordOtpVerify)("fail", "INVALID_CODE");
         return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
     }
     // 🆕 메트릭: OTP 검증 성공
-    (0, metrics_1.recordOtpVerify)('success', 'VALID_CODE');
+    (0, metrics_1.recordOtpVerify)("success", "VALID_CODE");
     const user = await (0, userRepo_1.findByPhone)(e164);
     if (!user)
         return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -95,7 +95,7 @@ exports.loginRouter.post("/verify-login", async (req, res) => {
     const at = (0, jwt_1.signAccessToken)(String(user.id), jti);
     const rt = (0, jwt_1.signRefreshToken)(String(user.id), jti);
     // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-    console.log('[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):', { jti, userId: String(user.id) });
+    console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
     // TODO: refresh_tokens 테이블 생성 후 활성화
     // await saveNewRefreshToken({
     //   jti, userId: String(user.id), token: rt,
@@ -105,7 +105,7 @@ exports.loginRouter.post("/verify-login", async (req, res) => {
     // });
     (0, cookies_1.setAuthCookies)(res, at, rt);
     // 🆕 메트릭: 사용자 로그인 성공
-    (0, metrics_1.recordUserLogin)('success', 'LOGIN_OK');
+    (0, metrics_1.recordUserLogin)("success", "LOGIN_OK");
     return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 // 프론트 요청 경로에 맞춰 /verify-code 추가 (verify-login과 동일)
@@ -117,11 +117,11 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
     const ok = otp.verifyCode(e164, code, "login");
     if (!ok) {
         // 🆕 메트릭: OTP 검증 실패
-        (0, metrics_1.recordOtpVerify)('fail', 'INVALID_CODE');
+        (0, metrics_1.recordOtpVerify)("fail", "INVALID_CODE");
         return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
     }
     // 🆕 메트릭: OTP 검증 성공
-    (0, metrics_1.recordOtpVerify)('success', 'VALID_CODE');
+    (0, metrics_1.recordOtpVerify)("success", "VALID_CODE");
     const user = await (0, userRepo_1.findByPhone)(e164);
     if (!user)
         return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -129,7 +129,7 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
     const at = (0, jwt_1.signAccessToken)(String(user.id), jti);
     const rt = (0, jwt_1.signRefreshToken)(String(user.id), jti);
     // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-    console.log('[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):', { jti, userId: String(user.id) });
+    console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
     // TODO: refresh_tokens 테이블 생성 후 활성화
     // await saveNewRefreshToken({
     //   jti, userId: String(user.id), token: rt,
@@ -139,7 +139,7 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
     // });
     (0, cookies_1.setAuthCookies)(res, at, rt);
     // 🆕 메트릭: 사용자 로그인 성공
-    (0, metrics_1.recordUserLogin)('success', 'LOGIN_OK');
+    (0, metrics_1.recordUserLogin)("success", "LOGIN_OK");
     return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 // 세션 확인
@@ -153,6 +153,6 @@ exports.loginRouter.get("/me", authJwt_1.default, async (req, res) => {
     return res.ok({
         id: user.id,
         phone: user.phone,
-        nickname: user.nickname
+        nickname: user.nickname,
     }, "OK");
 });

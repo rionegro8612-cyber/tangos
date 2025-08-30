@@ -27,7 +27,7 @@ function responseMiddleware(req, res, next) {
 /** 일관 에러 핸들러 */
 function standardErrorHandler(err, req, res, _next) {
     const status = Number(err?.status || 500);
-    const code = status >= 500 ? "INTERNAL_ERROR" : (err?.code || "ERROR");
+    const code = status >= 500 ? "INTERNAL_ERROR" : err?.code || "ERROR";
     const message = err?.message || "server error";
     res.status(status).json({
         success: false,

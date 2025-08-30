@@ -46,27 +46,27 @@ async function executeMigrationStep(step) {
         // 성공 기록
         await db_1.pool.query(`INSERT INTO migration_history 
        (version, step_id, step_name, execution_time_ms, success) 
-       VALUES ($1, $2, $3, $4, $5)`, ['current', step.id, step.name, executionTime, true]);
+       VALUES ($1, $2, $3, $4, $5)`, ["current", step.id, step.name, executionTime, true]);
         return {
             success: true,
             stepId: step.id,
             message: `Step ${step.name} executed successfully`,
-            executionTime
+            executionTime,
         };
     }
     catch (error) {
         const executionTime = Date.now() - startTime;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         // 실패 기록
         await db_1.pool.query(`INSERT INTO migration_history 
        (version, step_id, step_name, execution_time_ms, success, error_message) 
-       VALUES ($1, $2, $3, $4, $5, $6)`, ['current', step.id, step.name, executionTime, false, errorMessage]);
+       VALUES ($1, $2, $3, $4, $5, $6)`, ["current", step.id, step.name, executionTime, false, errorMessage]);
         return {
             success: false,
             stepId: step.id,
             message: `Step ${step.name} failed`,
             executionTime,
-            error: errorMessage
+            error: errorMessage,
         };
     }
 }
@@ -80,7 +80,7 @@ async function rollbackMigrationStep(step) {
             stepId: step.id,
             message: `No rollback SQL for step ${step.name}`,
             executionTime: 0,
-            error: 'Rollback SQL not provided'
+            error: "Rollback SQL not provided",
         };
     }
     const startTime = Date.now();
@@ -97,18 +97,18 @@ async function rollbackMigrationStep(step) {
             success: true,
             stepId: step.id,
             message: `Step ${step.name} rolled back successfully`,
-            executionTime
+            executionTime,
         };
     }
     catch (error) {
         const executionTime = Date.now() - startTime;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return {
             success: false,
             stepId: step.id,
             message: `Step ${step.name} rollback failed`,
             executionTime,
-            error: errorMessage
+            error: errorMessage,
         };
     }
 }
@@ -172,28 +172,28 @@ async function getMigrationStatus() {
         const lastExecuted = row.last_executed;
         let status;
         if (totalSteps === 0) {
-            status = 'pending';
+            status = "pending";
         }
         else if (failedSteps > 0) {
-            status = 'failed';
+            status = "failed";
         }
         else if (completedSteps === totalSteps) {
-            status = 'completed';
+            status = "completed";
         }
         else {
-            status = 'in_progress';
+            status = "in_progress";
         }
         return {
-            version: 'current',
+            version: "current",
             totalSteps,
             completedSteps,
             failedSteps,
             lastExecuted,
-            status
+            status,
         };
     }
     catch (error) {
-        console.error('[MIGRATION] Failed to get status:', error);
+        console.error("[MIGRATION] Failed to get status:", error);
         throw error;
     }
 }
@@ -234,10 +234,10 @@ async function rollbackMigration(version) {
             const step = {
                 id: row.step_id,
                 name: row.step_name,
-                sql: '', // 롤백용이므로 빈 문자열
+                sql: "", // 롤백용이므로 빈 문자열
                 rollbackSql: row.rollback_sql,
                 required: true,
-                order: 0
+                order: 0,
             };
             const rollbackResult = await rollbackMigrationStep(step);
             results.push(rollbackResult);

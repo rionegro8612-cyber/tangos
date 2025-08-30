@@ -80,6 +80,5 @@ function clearAuthCookies(res) {
 function getAccessTokenFromCookies(cookies) {
     if (!cookies)
         return undefined;
-    return cookies[exports.ACCESS_COOKIE]
-        || cookies[exports.COOKIE_NAME];
+    return (cookies[exports.ACCESS_COOKIE] || cookies[exports.COOKIE_NAME]);
 }

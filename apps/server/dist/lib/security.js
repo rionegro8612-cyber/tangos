@@ -18,10 +18,34 @@ exports.sanitizeLogMessage = sanitizeLogMessage;
 exports.getSecurityStatus = getSecurityStatus;
 // ===== 민감정보 키 상수 정의 🆕 추가 =====
 exports.SENSITIVE_KEYS = [
-    'password', 'passwd', 'pwd', 'secret', 'token', 'key', 'api_key', 'apikey',
-    'auth', 'authorization', 'cookie', 'session', 'jwt', 'access_token', 'refresh_token',
-    'credit_card', 'card_number', 'cvv', 'ssn', 'resident_number', 'phone', 'email',
-    'address', 'zip', 'postal', 'city', 'state', 'country'
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token",
+    "key",
+    "api_key",
+    "apikey",
+    "auth",
+    "authorization",
+    "cookie",
+    "session",
+    "jwt",
+    "access_token",
+    "refresh_token",
+    "credit_card",
+    "card_number",
+    "cvv",
+    "ssn",
+    "resident_number",
+    "phone",
+    "email",
+    "address",
+    "zip",
+    "postal",
+    "city",
+    "state",
+    "country",
 ];
 // ===== PII 마스킹 함수들 =====
 /**
@@ -29,46 +53,46 @@ exports.SENSITIVE_KEYS = [
  * 예: +821012345678 → +82****5678
  */
 function maskPhone(phone) {
-    if (!phone || typeof phone !== 'string')
-        return '[REDACTED]';
+    if (!phone || typeof phone !== "string")
+        return "[REDACTED]";
     // +82로 시작하는 한국 전화번호
-    if (phone.startsWith('+82')) {
+    if (phone.startsWith("+82")) {
         const prefix = phone.substring(0, 3); // +82
-        const middle = '****';
+        const middle = "****";
         const suffix = phone.substring(phone.length - 4); // 마지막 4자리
         return `${prefix}${middle}${suffix}`;
     }
     // 다른 형식의 전화번호
     if (phone.length >= 8) {
         const prefix = phone.substring(0, 2);
-        const middle = '****';
+        const middle = "****";
         const suffix = phone.substring(phone.length - 4);
         return `${prefix}${middle}${suffix}`;
     }
-    return '[REDACTED]';
+    return "[REDACTED]";
 }
 /**
  * 이메일 마스킹: a***@b***.com
  */
 function maskEmail(email) {
-    if (!email || typeof email !== 'string')
-        return '[REDACTED]';
-    const [local, domain] = email.split('@');
+    if (!email || typeof email !== "string")
+        return "[REDACTED]";
+    const [local, domain] = email.split("@");
     if (!domain)
-        return '[REDACTED]';
-    const maskedLocal = local.length > 1 ? `${local[0]}***` : '***';
-    const [domainName, tld] = domain.split('.');
-    const maskedDomain = domainName.length > 1 ? `${domainName[0]}***` : '***';
+        return "[REDACTED]";
+    const maskedLocal = local.length > 1 ? `${local[0]}***` : "***";
+    const [domainName, tld] = domain.split(".");
+    const maskedDomain = domainName.length > 1 ? `${domainName[0]}***` : "***";
     return `${maskedLocal}@${maskedDomain}.${tld}`;
 }
 /**
  * 이름 마스킹: 김***, 홍***
  */
 function maskName(name) {
-    if (!name || typeof name !== 'string')
-        return '[REDACTED]';
+    if (!name || typeof name !== "string")
+        return "[REDACTED]";
     if (name.length <= 1)
-        return '***';
+        return "***";
     if (name.length === 2)
         return `${name[0]}***`;
     return `${name[0]}***`;
@@ -77,25 +101,25 @@ function maskName(name) {
  * 주민등록번호 마스킹: 123456-*******
  */
 function maskResidentNumber(rn) {
-    if (!rn || typeof rn !== 'string')
-        return '[REDACTED]';
-    const cleaned = rn.replace(/[^0-9]/g, '');
+    if (!rn || typeof rn !== "string")
+        return "[REDACTED]";
+    const cleaned = rn.replace(/[^0-9]/g, "");
     if (cleaned.length !== 13)
-        return '[REDACTED]';
+        return "[REDACTED]";
     return `${cleaned.substring(0, 6)}-*******`;
 }
 /**
  * 신용카드 번호 마스킹: 1234-****-****-5678
  */
 function maskCreditCard(card) {
-    if (!card || typeof card !== 'string')
-        return '[REDACTED]';
-    const cleaned = card.replace(/[^0-9]/g, '');
+    if (!card || typeof card !== "string")
+        return "[REDACTED]";
+    const cleaned = card.replace(/[^0-9]/g, "");
     if (cleaned.length < 13 || cleaned.length > 19)
-        return '[REDACTED]';
+        return "[REDACTED]";
     const prefix = cleaned.substring(0, 4);
     const suffix = cleaned.substring(cleaned.length - 4);
-    const middle = '*'.repeat(cleaned.length - 8);
+    const middle = "*".repeat(cleaned.length - 8);
     return `${prefix}-${middle}-${middle}-${suffix}`;
 }
 // ===== 민감정보 제거 함수들 =====
@@ -103,33 +127,33 @@ function maskCreditCard(card) {
  * 객체에서 민감한 키들을 제거하거나 마스킹
  */
 function sanitizeObject(obj, sensitiveKeys = []) {
-    if (!obj || typeof obj !== 'object')
+    if (!obj || typeof obj !== "object")
         return obj;
     // 🆕 SENSITIVE_KEYS 상수 사용
     const allSensitiveKeys = [...new Set([...exports.SENSITIVE_KEYS, ...sensitiveKeys])];
     if (Array.isArray(obj)) {
-        return obj.map(item => sanitizeObject(item, allSensitiveKeys));
+        return obj.map((item) => sanitizeObject(item, allSensitiveKeys));
     }
     const sanitized = {};
     for (const [key, value] of Object.entries(obj)) {
         const lowerKey = key.toLowerCase();
-        const isSensitive = allSensitiveKeys.some(sensitive => lowerKey.includes(sensitive) || sensitive.includes(lowerKey));
+        const isSensitive = allSensitiveKeys.some((sensitive) => lowerKey.includes(sensitive) || sensitive.includes(lowerKey));
         if (isSensitive) {
             // 민감한 키는 마스킹하거나 제거
-            if (lowerKey.includes('phone')) {
+            if (lowerKey.includes("phone")) {
                 sanitized[key] = maskPhone(value);
             }
-            else if (lowerKey.includes('email')) {
+            else if (lowerKey.includes("email")) {
                 sanitized[key] = maskEmail(value);
             }
-            else if (lowerKey.includes('name')) {
+            else if (lowerKey.includes("name")) {
                 sanitized[key] = maskName(value);
             }
             else {
-                sanitized[key] = '[REDACTED]';
+                sanitized[key] = "[REDACTED]";
             }
         }
-        else if (typeof value === 'object' && value !== null) {
+        else if (typeof value === "object" && value !== null) {
             // 중첩된 객체는 재귀적으로 처리
             sanitized[key] = sanitizeObject(value, allSensitiveKeys);
         }
@@ -147,7 +171,7 @@ function sanitizeHttpBody(body) {
     if (!body)
         return body;
     // JSON 문자열인 경우 파싱 후 처리
-    if (typeof body === 'string') {
+    if (typeof body === "string") {
         try {
             const parsed = JSON.parse(body);
             return sanitizeObject(parsed, exports.SENSITIVE_KEYS);
@@ -158,7 +182,7 @@ function sanitizeHttpBody(body) {
         }
     }
     // 객체인 경우 직접 처리
-    if (typeof body === 'object') {
+    if (typeof body === "object") {
         return sanitizeObject(body, exports.SENSITIVE_KEYS);
     }
     return body;
@@ -167,7 +191,7 @@ function sanitizeHttpBody(body) {
  * 에러 객체에서 민감정보 제거 (스택 트레이스는 유지)
  */
 function sanitizeError(error) {
-    if (!error || typeof error !== 'object')
+    if (!error || typeof error !== "object")
         return error;
     const sanitized = {
         name: error.name,
@@ -175,12 +199,12 @@ function sanitizeError(error) {
         stack: error.stack, // 스택 트레이스는 유지
         code: error.code,
         status: error.status,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
     };
     // 추가 속성들도 민감정보 제거
     for (const [key, value] of Object.entries(error)) {
-        if (!['name', 'message', 'stack', 'code', 'status', 'statusCode'].includes(key)) {
-            if (typeof value === 'object' && value !== null) {
+        if (!["name", "message", "stack", "code", "status", "statusCode"].includes(key)) {
+            if (typeof value === "object" && value !== null) {
                 sanitized[key] = sanitizeObject(value);
             }
             else {
@@ -199,7 +223,7 @@ exports.LOG_SAMPLING_RATES = {
     warn: 1.0, // 100%: 모든 경고 로그
     info: 0.1, // 10%: 정보 로그
     debug: 0.01, // 1%: 디버그 로그
-    trace: 0.001 // 0.1%: 트레이스 로그
+    trace: 0.001, // 0.1%: 트레이스 로그
 };
 /**
  * 로그 레벨별 샘플링 결정
@@ -232,18 +256,23 @@ function shouldLogWithEnv(level) {
  * 민감한 헤더 제거
  */
 function sanitizeHeaders(headers) {
-    if (!headers || typeof headers !== 'object')
+    if (!headers || typeof headers !== "object")
         return headers;
     const sensitiveHeaders = [
-        'authorization', 'cookie', 'x-api-key', 'x-auth-token',
-        'x-session-id', 'x-csrf-token', 'x-xsrf-token'
+        "authorization",
+        "cookie",
+        "x-api-key",
+        "x-auth-token",
+        "x-session-id",
+        "x-csrf-token",
+        "x-xsrf-token",
     ];
     const sanitized = {};
     for (const [key, value] of Object.entries(headers)) {
         const lowerKey = key.toLowerCase();
-        const isSensitive = sensitiveHeaders.some(sensitive => lowerKey.includes(sensitive) || sensitive.includes(lowerKey));
+        const isSensitive = sensitiveHeaders.some((sensitive) => lowerKey.includes(sensitive) || sensitive.includes(lowerKey));
         if (isSensitive) {
-            sanitized[key] = '[REDACTED]';
+            sanitized[key] = "[REDACTED]";
         }
         else {
             sanitized[key] = value;
@@ -255,14 +284,14 @@ function sanitizeHeaders(headers) {
  * URL에서 쿼리 파라미터 민감정보 제거
  */
 function sanitizeUrl(url) {
-    if (!url || typeof url !== 'string')
+    if (!url || typeof url !== "string")
         return url;
     try {
         const urlObj = new URL(url);
-        const sensitiveParams = ['token', 'key', 'auth', 'password', 'secret', 'api_key'];
+        const sensitiveParams = ["token", "key", "auth", "password", "secret", "api_key"];
         for (const param of sensitiveParams) {
             if (urlObj.searchParams.has(param)) {
-                urlObj.searchParams.set(param, '[REDACTED]');
+                urlObj.searchParams.set(param, "[REDACTED]");
             }
         }
         return urlObj.toString();
@@ -275,7 +304,7 @@ function sanitizeUrl(url) {
  * 로그 메시지에서 민감정보 패턴 제거
  */
 function sanitizeLogMessage(message) {
-    if (!message || typeof message !== 'string')
+    if (!message || typeof message !== "string")
         return message;
     // 전화번호 패턴 마스킹
     message = message.replace(/(\+82[0-9]{9,})/g, (match) => maskPhone(match));
@@ -300,8 +329,8 @@ function getSecurityStatus() {
             warn: exports.LOG_SAMPLING_RATES.warn,
             info: exports.LOG_SAMPLING_RATES.info,
             debug: exports.LOG_SAMPLING_RATES.debug,
-            trace: exports.LOG_SAMPLING_RATES.trace
+            trace: exports.LOG_SAMPLING_RATES.trace,
         },
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || "development",
     };
 }

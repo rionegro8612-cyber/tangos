@@ -1,1 +1,59 @@
+name: Server CI
 
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/server/**'
+      - '.github/workflows/pr.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/server/**'
+  workflow_dispatch: {}  # 수동 실행도 허용
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/server
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      REDIS_URL: redis://localhost:6379
+      METRICS_ENABLED: false   # 테스트에서 메트릭 비활성화
+      CI: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/server/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test -- --runInBand --passWithNoTests

@@ -7,7 +7,7 @@ const profileRouter = Router();
 // 닉네임 중복 체크
 profileRouter.get("/nickname/check", async (req, res) => {
   try {
-    const { value } = req.query;
+    const { value, userId } = req.query;
     if (!value || typeof value !== "string") {
       return res.status(400).json({
         success: false,
@@ -27,8 +27,15 @@ profileRouter.get("/nickname/check", async (req, res) => {
       });
     }
 
-    // 중복 체크
-    const exists = await query(`SELECT 1 FROM users WHERE nickname = $1 LIMIT 1`, [nickname]);
+    // 중복 체크 (자신 제외)
+    let exists;
+    if (userId && typeof userId === "string" && uuidValidate(userId)) {
+      // userId가 제공된 경우: 자신 제외하고 중복 체크
+      exists = await query(`SELECT 1 FROM users WHERE nickname = $1 AND id != $2::uuid LIMIT 1`, [nickname, userId]);
+    } else {
+      // userId가 없는 경우: 기존 동작 유지 (모든 사용자에서 중복 체크)
+      exists = await query(`SELECT 1 FROM users WHERE nickname = $1 LIMIT 1`, [nickname]);
+    }
 
     const available = exists.rows.length === 0;
 

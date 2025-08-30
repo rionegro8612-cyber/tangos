@@ -49,7 +49,7 @@ async function query(text, params) {
         const result = await client.query(text, params);
         return {
             rows: result.rows,
-            rowCount: result.rowCount || 0
+            rowCount: result.rowCount || 0,
         };
     }
     finally {

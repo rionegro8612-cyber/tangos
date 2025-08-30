@@ -8,11 +8,11 @@ const router = (0, express_1.Router)();
 // ===== 미들웨어: 관리자 권한 확인 =====
 const requireAdmin = (req, res, next) => {
     // 🚨 실제 구현에서는 JWT 토큰 검증 및 관리자 권한 확인
-    const isAdmin = req.headers['x-admin-token'] === process.env.ADMIN_TOKEN;
+    const isAdmin = req.headers["x-admin-token"] === process.env.ADMIN_TOKEN;
     if (!isAdmin) {
         return res.status(403).json({
-            error: 'Forbidden',
-            message: '관리자 권한이 필요합니다.'
+            error: "Forbidden",
+            message: "관리자 권한이 필요합니다.",
         });
     }
     next();
@@ -22,23 +22,23 @@ const requireAdmin = (req, res, next) => {
  * GET /audit/logs
  * 모든 감사 로그 조회 (관리자 전용)
  */
-router.get('/logs', requireAdmin, (req, res) => {
+router.get("/logs", requireAdmin, (req, res) => {
     try {
-        const { userId, eventType, startDate, endDate, limit = '100', offset = '0' } = req.query;
+        const { userId, eventType, startDate, endDate, limit = "100", offset = "0" } = req.query;
         let logs = audit_1.auditLogger.getAllLogs();
         // 사용자별 필터링
-        if (userId && typeof userId === 'string') {
-            logs = logs.filter(log => log.userId === userId);
+        if (userId && typeof userId === "string") {
+            logs = logs.filter((log) => log.userId === userId);
         }
         // 이벤트 타입별 필터링
-        if (eventType && typeof eventType === 'string') {
-            logs = logs.filter(log => log.eventType === eventType);
+        if (eventType && typeof eventType === "string") {
+            logs = logs.filter((log) => log.eventType === eventType);
         }
         // 날짜 범위 필터링
         if (startDate && endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
-            logs = logs.filter(log => {
+            logs = logs.filter((log) => {
                 const logDate = new Date(log.timestamp);
                 return logDate >= start && logDate <= end;
             });
@@ -48,7 +48,7 @@ router.get('/logs', requireAdmin, (req, res) => {
         const offsetNum = parseInt(offset) || 0;
         const paginatedLogs = logs.slice(offsetNum, offsetNum + limitNum);
         // 민감정보 제거
-        const sanitizedLogs = paginatedLogs.map(log => (0, security_1.sanitizeObject)(log));
+        const sanitizedLogs = paginatedLogs.map((log) => (0, security_1.sanitizeObject)(log));
         res.json({
             success: true,
             data: {
@@ -57,16 +57,16 @@ router.get('/logs', requireAdmin, (req, res) => {
                     total: logs.length,
                     limit: limitNum,
                     offset: offsetNum,
-                    hasMore: offsetNum + limitNum < logs.length
-                }
-            }
+                    hasMore: offsetNum + limitNum < logs.length,
+                },
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching logs:', error);
+        console.error("[AUDIT] Error fetching logs:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: '감사 로그 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "감사 로그 조회 중 오류가 발생했습니다.",
         });
     }
 });
@@ -74,17 +74,17 @@ router.get('/logs', requireAdmin, (req, res) => {
  * GET /audit/logs/user/:userId
  * 특정 사용자의 감사 로그 조회 (관리자 전용)
  */
-router.get('/logs/user/:userId', requireAdmin, (req, res) => {
+router.get("/logs/user/:userId", requireAdmin, (req, res) => {
     try {
         const { userId } = req.params;
-        const { limit = '100', offset = '0' } = req.query;
+        const { limit = "100", offset = "0" } = req.query;
         const logs = audit_1.auditLogger.getLogsByUser(userId);
         // 페이지네이션
         const limitNum = parseInt(limit) || 100;
         const offsetNum = parseInt(offset) || 0;
         const paginatedLogs = logs.slice(offsetNum, offsetNum + limitNum);
         // 민감정보 제거
-        const sanitizedLogs = paginatedLogs.map(log => (0, security_1.sanitizeObject)(log));
+        const sanitizedLogs = paginatedLogs.map((log) => (0, security_1.sanitizeObject)(log));
         res.json({
             success: true,
             data: {
@@ -94,16 +94,16 @@ router.get('/logs/user/:userId', requireAdmin, (req, res) => {
                     total: logs.length,
                     limit: limitNum,
                     offset: offsetNum,
-                    hasMore: offsetNum + limitNum < logs.length
-                }
-            }
+                    hasMore: offsetNum + limitNum < logs.length,
+                },
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching user logs:', error);
+        console.error("[AUDIT] Error fetching user logs:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: '사용자 감사 로그 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "사용자 감사 로그 조회 중 오류가 발생했습니다.",
         });
     }
 });
@@ -111,17 +111,17 @@ router.get('/logs/user/:userId', requireAdmin, (req, res) => {
  * GET /audit/logs/event/:eventType
  * 특정 이벤트 타입의 감사 로그 조회 (관리자 전용)
  */
-router.get('/logs/event/:eventType', requireAdmin, (req, res) => {
+router.get("/logs/event/:eventType", requireAdmin, (req, res) => {
     try {
         const { eventType } = req.params;
-        const { limit = '100', offset = '0' } = req.query;
+        const { limit = "100", offset = "0" } = req.query;
         const logs = audit_1.auditLogger.getLogsByEventType(eventType);
         // 페이지네이션
         const limitNum = parseInt(limit) || 100;
         const offsetNum = parseInt(offset) || 0;
         const paginatedLogs = logs.slice(offsetNum, offsetNum + limitNum);
         // 민감정보 제거
-        const sanitizedLogs = paginatedLogs.map(log => (0, security_1.sanitizeObject)(log));
+        const sanitizedLogs = paginatedLogs.map((log) => (0, security_1.sanitizeObject)(log));
         res.json({
             success: true,
             data: {
@@ -131,16 +131,16 @@ router.get('/logs/event/:eventType', requireAdmin, (req, res) => {
                     total: logs.length,
                     limit: limitNum,
                     offset: offsetNum,
-                    hasMore: offsetNum + limitNum < logs.length
-                }
-            }
+                    hasMore: offsetNum + limitNum < logs.length,
+                },
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching event logs:', error);
+        console.error("[AUDIT] Error fetching event logs:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: '이벤트 감사 로그 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "이벤트 감사 로그 조회 중 오류가 발생했습니다.",
         });
     }
 });
@@ -149,16 +149,16 @@ router.get('/logs/event/:eventType', requireAdmin, (req, res) => {
  * POST /audit/pii/deletion
  * PII 삭제 요청 생성 (사용자 또는 관리자)
  */
-router.post('/pii/deletion', async (req, res) => {
+router.post("/pii/deletion", async (req, res) => {
     try {
-        const { userPhone, userEmail, userId, dataTypes, reason = 'user_request', priority = 'normal' } = req.body;
-        const userIp = req.ip || req.connection.remoteAddress || 'unknown';
-        const requestId = req.headers['x-request-id'] || 'unknown';
+        const { userPhone, userEmail, userId, dataTypes, reason = "user_request", priority = "normal", } = req.body;
+        const userIp = req.ip || req.connection.remoteAddress || "unknown";
+        const requestId = req.headers["x-request-id"] || "unknown";
         // 필수 필드 검증
         if (!userPhone && !userEmail && !userId) {
             return res.status(400).json({
-                error: 'Bad Request',
-                message: '전화번호, 이메일, 또는 사용자 ID 중 하나는 필수입니다.'
+                error: "Bad Request",
+                message: "전화번호, 이메일, 또는 사용자 ID 중 하나는 필수입니다.",
             });
         }
         // PII 삭제 요청 생성
@@ -168,15 +168,15 @@ router.post('/pii/deletion', async (req, res) => {
             data: {
                 requestId: deletionRequest.id,
                 status: deletionRequest.status,
-                message: 'PII 삭제 요청이 생성되었습니다.'
-            }
+                message: "PII 삭제 요청이 생성되었습니다.",
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error creating PII deletion request:', error);
+        console.error("[AUDIT] Error creating PII deletion request:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'PII 삭제 요청 생성 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "PII 삭제 요청 생성 중 오류가 발생했습니다.",
         });
     }
 });
@@ -184,21 +184,21 @@ router.post('/pii/deletion', async (req, res) => {
  * POST /audit/pii/deletion/:requestId/process
  * PII 삭제 요청 처리 (관리자 전용)
  */
-router.post('/pii/deletion/:requestId/process', requireAdmin, async (req, res) => {
+router.post("/pii/deletion/:requestId/process", requireAdmin, async (req, res) => {
     try {
         const { requestId } = req.params;
         // PII 삭제 요청 처리
         const result = await pii_management_1.piiManager.processDeletionRequest(requestId);
         res.json({
             success: true,
-            data: result
+            data: result,
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error processing PII deletion request:', error);
+        console.error("[AUDIT] Error processing PII deletion request:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'PII 삭제 요청 처리 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "PII 삭제 요청 처리 중 오류가 발생했습니다.",
         });
     }
 });
@@ -206,24 +206,24 @@ router.post('/pii/deletion/:requestId/process', requireAdmin, async (req, res) =
  * GET /audit/pii/deletion
  * PII 삭제 요청 목록 조회 (관리자 전용)
  */
-router.get('/pii/deletion', requireAdmin, (req, res) => {
+router.get("/pii/deletion", requireAdmin, (req, res) => {
     try {
-        const { status, userId, limit = '100', offset = '0' } = req.query;
+        const { status, userId, limit = "100", offset = "0" } = req.query;
         let requests = pii_management_1.piiManager.getAllDeletionRequests();
         // 상태별 필터링
-        if (status && typeof status === 'string') {
-            requests = requests.filter(req => req.status === status);
+        if (status && typeof status === "string") {
+            requests = requests.filter((req) => req.status === status);
         }
         // 사용자별 필터링
-        if (userId && typeof userId === 'string') {
-            requests = requests.filter(req => req.userId === userId);
+        if (userId && typeof userId === "string") {
+            requests = requests.filter((req) => req.userId === userId);
         }
         // 페이지네이션
         const limitNum = parseInt(limit) || 100;
         const offsetNum = parseInt(offset) || 0;
         const paginatedRequests = requests.slice(offsetNum, offsetNum + limitNum);
         // 민감정보 제거
-        const sanitizedRequests = paginatedRequests.map(req => (0, security_1.sanitizeObject)(req));
+        const sanitizedRequests = paginatedRequests.map((req) => (0, security_1.sanitizeObject)(req));
         res.json({
             success: true,
             data: {
@@ -232,16 +232,16 @@ router.get('/pii/deletion', requireAdmin, (req, res) => {
                     total: requests.length,
                     limit: limitNum,
                     offset: offsetNum,
-                    hasMore: offsetNum + limitNum < requests.length
-                }
-            }
+                    hasMore: offsetNum + limitNum < requests.length,
+                },
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching PII deletion requests:', error);
+        console.error("[AUDIT] Error fetching PII deletion requests:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'PII 삭제 요청 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "PII 삭제 요청 조회 중 오류가 발생했습니다.",
         });
     }
 });
@@ -249,28 +249,28 @@ router.get('/pii/deletion', requireAdmin, (req, res) => {
  * GET /audit/pii/deletion/:requestId
  * 특정 PII 삭제 요청 조회 (관리자 전용)
  */
-router.get('/pii/deletion/:requestId', requireAdmin, (req, res) => {
+router.get("/pii/deletion/:requestId", requireAdmin, (req, res) => {
     try {
         const { requestId } = req.params;
         const request = pii_management_1.piiManager.getDeletionRequest(requestId);
         if (!request) {
             return res.status(404).json({
-                error: 'Not Found',
-                message: 'PII 삭제 요청을 찾을 수 없습니다.'
+                error: "Not Found",
+                message: "PII 삭제 요청을 찾을 수 없습니다.",
             });
         }
         // 민감정보 제거
         const sanitizedRequest = (0, security_1.sanitizeObject)(request);
         res.json({
             success: true,
-            data: sanitizedRequest
+            data: sanitizedRequest,
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching PII deletion request:', error);
+        console.error("[AUDIT] Error fetching PII deletion request:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'PII 삭제 요청 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "PII 삭제 요청 조회 중 오류가 발생했습니다.",
         });
     }
 });
@@ -279,7 +279,7 @@ router.get('/pii/deletion/:requestId', requireAdmin, (req, res) => {
  * GET /audit/status
  * Audit 시스템 상태 확인
  */
-router.get('/status', (req, res) => {
+router.get("/status", (req, res) => {
     try {
         const auditStatus = audit_1.auditLogger.getStatus();
         const piiStatus = pii_management_1.piiManager.getStatus();
@@ -288,23 +288,23 @@ router.get('/status', (req, res) => {
             data: {
                 audit: auditStatus,
                 pii: piiStatus,
-                timestamp: new Date().toISOString()
-            }
+                timestamp: new Date().toISOString(),
+            },
         });
     }
     catch (error) {
-        console.error('[AUDIT] Error fetching status:', error);
+        console.error("[AUDIT] Error fetching status:", error);
         res.status(500).json({
-            error: 'Internal Server Error',
-            message: '시스템 상태 조회 중 오류가 발생했습니다.'
+            error: "Internal Server Error",
+            message: "시스템 상태 조회 중 오류가 발생했습니다.",
         });
     }
 });
 // ===== 에러 핸들링 =====
-router.use('*', (req, res) => {
+router.use("*", (req, res) => {
     res.status(404).json({
-        error: 'Not Found',
-        message: '요청한 엔드포인트를 찾을 수 없습니다.'
+        error: "Not Found",
+        message: "요청한 엔드포인트를 찾을 수 없습니다.",
     });
 });
 exports.default = router;

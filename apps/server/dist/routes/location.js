@@ -14,12 +14,12 @@ router.get("/search", async (req, res) => {
         }
         const items = await (0, location_1.searchLocation)(q);
         // 프론트 표준화: label/code/lat/lng
-        const normalized = items.map(it => ({
+        const normalized = items.map((it) => ({
             label: it.label,
             code: it.code ?? null,
             lat: it.lat ?? null,
             lng: it.lng ?? null,
-            source: it.source
+            source: it.source,
         }));
         return res.ok({ items: normalized }, "OK");
     }
