@@ -9,6 +9,8 @@ import {
   findByPhone,
 } from "../repos/userRepo";
 import { signAccessToken, signRefreshToken, verifyAccessToken, newJti } from "../lib/jwt";
+import { getTokenFromReq } from "../lib/auth.shared";
+import { verifyAccessTokenOrThrow } from "../lib/jwt";
 import {
   setOtp,
   getOtp,
@@ -49,13 +51,6 @@ function phoneMasked(phone: string): string {
 }
 
 // 쿠키 관련 함수들은 lib/cookies.ts에서 import하여 사용
-
-/** Authorization: Bearer 또는 httpOnly cookie에서 access 토큰 추출 */
-function getTokenFromReq(req: Request) {
-  const hdr = req.headers.authorization || "";
-  const m = hdr.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] || (req.cookies?.access_token as string | undefined);
-}
 
 /** POST /api/v1/auth/send-sms */
 authRouter.post("/send-sms", 
@@ -580,7 +575,7 @@ authRouter.post("/logout", async (_req: Request, res: Response, next: NextFuncti
 /** GET /api/v1/auth/me — 쿠키(or Bearer)에서 Access 검증 */
 authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = getTokenFromReq(req);
+    const token = getTokenFromReq(req);              // ✅ 쿠키→헤더
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -590,22 +585,9 @@ authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) =>
         requestId: (req as any).requestId ?? null,
       });
     }
-
-    const decoded: any = verifyAccessToken(token);
-    const userId = String(decoded?.uid);
-
-    // UUID 형식 검증 (uuidValidate 사용)
-    if (!userId || !uuidValidate(userId)) {
-      return res.status(401).json({
-        success: false,
-        code: "UNAUTHORIZED",
-        message: "invalid token",
-        data: null,
-        requestId: (req as any).requestId ?? null,
-      });
-    }
-
-    const user = await getUserProfile(userId);
+    
+    const { uid } = verifyAccessTokenOrThrow(token); // ✅ 같은 시크릿/같은 파서
+    const user = await getUserProfile(uid);
     return res.ok({ user }, "ME_OK", "ME_OK");
   } catch (e) {
     next(e);

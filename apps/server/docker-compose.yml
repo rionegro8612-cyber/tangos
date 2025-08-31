@@ -15,15 +15,11 @@ services:
       - PHONE_ENC_KEY=${PHONE_ENC_KEY:-dev-32-bytes-minimum-secret-key}
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      redis:    { condition: service_healthy }
     networks:
       - tango-network
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -qO- http://localhost:4100/api/v1/_ping || curl -fsS http://localhost:4100/api/v1/_ping || exit 1",
-        ]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4100/api/v1/_ping || curl -fsS http://localhost:4100/api/v1/_ping || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -74,7 +70,7 @@ services:
     container_name: tango-loki
     ports:
       - "3100:3100"
-    command: ["-config.file=/etc/loki.yaml"]
+    command: [ "-config.file=/etc/loki.yaml" ]
     volumes:
       - ./loki-config.yaml:/etc/loki.yaml
       - loki-data:/loki
@@ -86,7 +82,7 @@ services:
   promtail:
     image: grafana/promtail:2.9.0
     container_name: tango-promtail
-    command: ["-config.file=/etc/promtail.yaml"]
+    command: [ "-config.file=/etc/promtail.yaml" ]
     volumes:
       - ./promtail-config.yaml:/etc/promtail.yaml
       - ./logs:/var/log/apps
@@ -122,10 +118,10 @@ services:
     image: grafana/tempo:2.3.0
     container_name: tango-tempo
     ports:
-      - "3200:3200" # HTTP
-      - "4318:4318" # OTLP HTTP
-      - "4317:4317" # OTLP gRPC
-    command: ["-config.file=/etc/tempo.yaml"]
+      - "3200:3200"   # HTTP
+      - "4318:4318"   # OTLP HTTP
+      - "4317:4317"   # OTLP gRPC
+    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
       - tempo-data:/tmp/tempo
@@ -140,12 +136,12 @@ services:
     ports:
       - "9090:9090"
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--storage.tsdb.retention.time=200h"
-      - "--web.enable-lifecycle"
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -162,16 +158,43 @@ services:
     ports:
       - "9093:9093"
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
-      - "--web.console.libraries=/etc/alertmanager/console_libraries"
-      - "--web.console.templates=/etc/alertmanager/consoles"
-      - "--web.enable-lifecycle"
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.console.libraries=/etc/alertmanager/console_libraries'
+      - '--web.console.templates=/etc/alertmanager/consoles'
+      - '--web.enable-lifecycle'
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
       - alertmanager-data:/alertmanager
     networks:
       - tango-logging
+    restart: unless-stopped
+
+  # ===== MinIO (S3 호환 객체 스토리지) =====
+  minio:
+    image: minio/minio:latest
+    container_name: tango-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - tango-network
+    restart: unless-stopped
+
+  # ===== MinIO Client (mc) =====
+  mc:
+    image: minio/mc:latest
+    container_name: tango-mc
+    depends_on:
+      - minio
+    networks:
+      - tango-network
     restart: unless-stopped
 
 volumes:
@@ -182,6 +205,7 @@ volumes:
   tempo-data:
   prometheus-data:
   alertmanager-data: # 🆕 추가
+  minio-data: # 🆕 MinIO 데이터
 
 networks:
   tango-network:

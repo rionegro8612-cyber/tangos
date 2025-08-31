@@ -8,6 +8,8 @@ import compatV1Router from "./compat.v1";
 import registerRouter from "./auth.register";
 import registerSubmitRouter from "./register.submit";
 import healthRouter from "./health";
+import communityRouter from "./community";
+import uploadRouter from "./upload";
 
 export const router = Router();
 
@@ -34,5 +36,11 @@ router.use("/auth", kycRouter);
 
 // User (프로필 등)
 router.use("/user", userRouter);
+
+// Community (커뮤니티 기능)
+router.use("/community", communityRouter);
+
+// Upload (파일 업로드)
+router.use("/upload", uploadRouter);
 
 export default router;

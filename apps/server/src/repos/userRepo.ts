@@ -51,7 +51,7 @@ export async function getUserProfile(userId: string) {
       age                   AS age,
       created_at            AS "createdAt"
     FROM users
-    WHERE id = $1::uuid
+    WHERE id = $1::integer
     `,
     [userId],
   );
@@ -60,13 +60,13 @@ export async function getUserProfile(userId: string) {
 
 /** 마지막 로그인 시각만 갱신 */
 export async function touchLastLogin(userId: string) {
-  await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1::uuid`, [userId]);
+  await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1::integer`, [userId]);
 }
 
 /** 닉네임 업데이트 (존재 보장 위해 RETURNING) */
 export async function updateUserNickname(userId: string, nickname: string | null) {
   const rows = await query<{ id: string }>(
-    `UPDATE users SET nickname = $2 WHERE id = $1::uuid RETURNING id`,
+    `UPDATE users SET nickname = $2 WHERE id = $1::integer RETURNING id`,
     [userId, nickname],
   );
   return rows.length > 0;
@@ -78,7 +78,7 @@ export async function updateKycStatus(userId: string, provider: string) {
        SET kyc_verified = TRUE,
            kyc_provider = $1,
            kyc_checked_at = NOW()
-     WHERE id = $2::uuid`,
+     WHERE id = $2::integer`,
     [provider, userId],
   );
 }
