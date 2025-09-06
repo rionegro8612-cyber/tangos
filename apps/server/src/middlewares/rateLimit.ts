@@ -109,7 +109,7 @@ export const rateLimitSend = async (req: Request, res: Response, next: NextFunct
     }
 
     // 쿨다운 설정 (현재 시간을 저장)
-    await redisClient.setEx(cooldownKey, RATE_LIMITS.send.cooldown, Date.now().toString());
+    await redisClient.setex(cooldownKey, RATE_LIMITS.send.cooldown, Date.now().toString());
 
     next();
   } catch (error) {

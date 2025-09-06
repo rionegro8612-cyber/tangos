@@ -36,7 +36,7 @@ registerRouter.post("/start", async (req, res) => {
     };
 
     const redis = await ensureRedis();
-    await redis.setEx(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
+    await redis.setex(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
 
     // 2) { requestId, ttlSec } 등 표준 응답
     return res.json({
@@ -78,36 +78,70 @@ registerRouter.post("/verify", async (req, res) => {
       });
     }
 
-    // OTP 검증
-    const { getOtp } = await import("../services/otp.redis");
-    const storedCode = await getOtp(phone);
-    if (!storedCode || storedCode !== code) {
-      return res.status(401).json({
+    // OTP 검증 (강화된 예외 처리)
+    try {
+      const { verifyOtp } = await import("../services/otp.redis");
+      const verifyResult = await verifyOtp(phone, code, "register");
+      
+      if (!verifyResult.ok) {
+        console.log(`[register] OTP verification failed for ${phone}: ${verifyResult.reason}`);
+        
+        if (verifyResult.reason === "INTERNAL_ERROR") {
+          return res.status(500).json({
+            success: false,
+            code: "INTERNAL_ERROR",
+            message: "서버 내부 오류",
+            data: null,
+            requestId: (req as any).requestId ?? null,
+          });
+        }
+        
+        return res.status(401).json({
+          success: false,
+          code: verifyResult.reason === "EXPIRED_OR_NOT_FOUND" ? "EXPIRED_CODE" : "INVALID_CODE",
+          message: verifyResult.reason === "EXPIRED_OR_NOT_FOUND" ? "인증번호가 만료되었습니다." : "인증번호가 올바르지 않습니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+      
+      console.log(`[register] OTP verification success for ${phone}`);
+      
+    } catch (otpError) {
+      console.error(`[register] OTP verification exception for ${phone}:`, otpError);
+      return res.status(500).json({
         success: false,
-        code: "INVALID_CODE",
-        message: "인증번호가 올바르지 않습니다.",
+        code: "INTERNAL_ERROR",
+        message: "서버 내부 오류",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
     }
 
     // 1) OTP 검증 → signup_sessions.phone_verified = true
-    const sessionKey = `reg:session:${phone}`;
-    const sessionData = await redis.get(sessionKey);
+    try {
+      const sessionKey = `reg:session:${phone}`;
+      const redisClient = await ensureRedis();
+      const sessionData = await redisClient.get(sessionKey);
 
-    if (sessionData) {
-      const session = JSON.parse(sessionData);
-      session.phoneVerified = true;
-      session.verifiedAt = new Date().toISOString();
-      session.status = "verified";
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        session.phoneVerified = true;
+        session.verifiedAt = new Date().toISOString();
+        session.status = "verified";
 
-      const redis = await ensureRedis();
-      await redis.setEx(sessionKey, 1800, JSON.stringify(session));
+        await redisClient.setex(sessionKey, 1800, JSON.stringify(session));
+        console.log(`[register] Session updated for ${phone}: phoneVerified=true`);
+      } else {
+        console.log(`[register] No session found for ${phone}`);
+      }
+
+      // OTP는 이미 verifyOtp에서 삭제됨
+      
+    } catch (redisError) {
+      console.error(`[register] Redis operation failed for ${phone}:`, redisError);
+      // Redis 오류가 있어도 OTP 검증은 성공으로 처리 (이미 검증됨)
     }
-
-    // OTP 코드 삭제
-    const { delOtp } = await import("../services/otp.redis");
-    await delOtp(phone);
 
     // 🚨 회원가입 티켓 생성 (register.submit에서 필요)
     const ticketKey = `reg:ticket:${phone}`;
@@ -122,7 +156,7 @@ registerRouter.post("/verify", async (req, res) => {
     
     try {
       const redis = await ensureRedis();
-      await redis.setEx(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
+      await redis.setex(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
       console.log(`[DEBUG] 가입 티켓 생성 성공: ${ticketKey}`);
       
       // 생성 확인

@@ -2,6 +2,22 @@
 
 Express + TypeScript 기반 백엔드 서버
 
+## 🚀 Router Architecture
+
+**메인 엔트리 포인트**: `src/routes/index.ts`만 사용
+
+- **단일 진입점**: `src/app.ts`에서 `import apiRouter from "./routes"` 하나만 사용
+- **라우터 구조**: 모든 라우터는 `src/routes/index.ts`에서 통합 관리
+- **과거 파일**: `dist/apiRouter.js`, `src/routes/mvp.ts` 등은 삭제됨 (혼란 방지)
+
+### 라우터 등록 순서
+1. 베이스 핑: `GET /api/v1/_ping` (앱 레벨 + 라우터 레벨 이중 보장)
+2. 헬스: `GET /api/v1/health/_ping`
+3. 인증: `POST /api/v1/auth/*`
+4. 커뮤니티: `GET /api/v1/community/*`
+5. 프로필: `POST /api/v1/profile/*`
+6. 업로드: `POST /api/v1/upload/*`
+
 ## Standard API Endpoints
 
 표준 엔드포인트 (외부 계약 고정):

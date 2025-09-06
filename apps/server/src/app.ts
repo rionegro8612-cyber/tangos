@@ -17,10 +17,22 @@ import apiRouter from "./routes";
 import { healthRouter } from "./routes/health";
 
 // 🆕 부팅 로그 추가
-console.log('[BOOT] app.ts file =', __filename);
+console.log('[BOOT] app.ts file =', 'src/app.ts');
 console.log('[BOOT] apiRouter resolved path =', require.resolve('./routes'));
 console.log('[BOOT] healthRouter path =', require.resolve('./routes/health'));
 console.log('[BOOT] communityRouter path =', require.resolve('./routes/community'));
+
+// 🆕 Redis 연결 테스트 (앱 부팅 시 1회 핑)
+(async () => {
+  try {
+    const redis = await ensureRedis();
+    const pong = await redis.ping();
+    console.log("🔌 Redis OK:", pong);
+  } catch (e) {
+    console.error("❌ Redis connect failed:", e);
+    console.error("Redis URL:", process.env.REDIS_URL);
+  }
+})();
 
 const app = express();
 app.disable("x-powered-by");
@@ -224,6 +236,11 @@ app.get('/__routes', (_req, res) => {
 // ▼ API 라우터 마운트 (가장 중요!)
 const API_BASE = process.env.API_BASE || "/api/v1";
 
+// 베이스 핑을 앱 레벨에서 보장 (라우터와 별개로 항상 응답)
+app.get(`${API_BASE}/_ping`, (_req, res) => {
+  res.type("text/plain").send("pong");
+});
+
 // 1) 가장 먼저 정확 경로로 health만 노출 (넓은 패턴 절대 금지)
 app.use(`${API_BASE}/health`, healthRouter);
 
@@ -269,6 +286,28 @@ if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
         }
       }
     });
+
+    // 실제 등록된 라우트들을 상세히 출력
+    console.log("\n📋 Detailed Route List:");
+    const routeList: string[] = [];
+    
+    const extractRoutes = (router: any, basePath: string = "") => {
+      if (router.stack) {
+        router.stack.forEach((layer: any) => {
+          if (layer.route) {
+            const methods = Object.keys(layer.route.methods).join(",").toUpperCase();
+            const path = `${API_BASE}${basePath}${layer.route.path}`;
+            routeList.push(`${methods.padEnd(6)} ${path}`);
+          } else if (layer.name === "router") {
+            const subPath = layer.regexp?.source?.replace(/\\\//g, "/").replace(/\^|\$|\\/g, "") || "";
+            extractRoutes(layer.handle, basePath + subPath);
+          }
+        });
+      }
+    };
+    
+    extractRoutes(apiRouter);
+    routeList.forEach(route => console.log(route));
 
     console.log("\n🔍 Manual route check:");
     console.log("GET  /api/v1/_ping");

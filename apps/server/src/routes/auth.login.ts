@@ -28,7 +28,7 @@ loginRouter.post("/send-sms", async (req, res) => {
   }
 
   const code = "" + Math.floor(100000 + Math.random() * 900000);
-  await setOtp(e164, code, 300); // 5분 TTL
+  await setOtp(e164, code, "login", 300); // 5분 TTL
 
   // send via SMS vendor (mock in dev by default)
   if (process.env.NODE_ENV !== "test") {

@@ -23,7 +23,7 @@ export async function checkAndMarkCooldown(phone: string) {
     if (exists > 0) {
       return { blocked: true, retryAfter: exists };
     }
-    await r.setEx(key, COOLDOWN_SEC, "1");
+    await r.setex(key, COOLDOWN_SEC, "1");
     return { blocked: false, retryAfter: 0 };
   } catch {
     // in-memory fallback

@@ -29,7 +29,7 @@ export const withIdempotency = (ttlSeconds: number = TTL_SEC) => {
     async function setToStore(value: string): Promise<void> {
       try {
         const r = await ensureRedis();
-        await r.setEx(`idem:${key}`, ttlSeconds, value);
+        await r.setex(`idem:${key}`, ttlSeconds, value);
         return;
       } catch (e) {
         // in-memory fallback

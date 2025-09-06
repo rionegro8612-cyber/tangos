@@ -31,7 +31,7 @@ export async function setTestOtp(phone: string, code: string, ttl: number = 300)
   try {
     const r = await ensureRedis();
     // 표준 키 구조 사용: otp:${phone}:code
-    await r.setEx(`otp:${phone}:code`, ttl, code);
+    await r.setex(`otp:${phone}:code`, ttl, code);
     console.log(`[TEST] Test OTP set: ${phone} -> ${code} (TTL: ${ttl}s)`);
   } catch (error) {
     console.error(`[TEST] Failed to set test OTP: ${phone}`, error);

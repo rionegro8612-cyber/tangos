@@ -11,14 +11,7 @@ import {
 import { signAccessToken, signRefreshToken, verifyAccessToken, newJti } from "../lib/jwt";
 import { getTokenFromReq } from "../lib/auth.shared";
 import { verifyAccessTokenOrThrow } from "../lib/jwt";
-import {
-  setOtp,
-  getOtp,
-  delOtp,
-  readIntFromEnv,
-  getRateLimitInfo,
-  rlIncr,
-} from "../services/otp.redis";
+import { issueOtp, verifyOtp, checkAndMarkCooldown, setOtp, getOtp, delOtp, fetchOtp } from "../services/otp.service";
 import { validate as uuidValidate } from "uuid";
 import { logOtpSend, logOtpVerify } from "../lib/logger";
 import {
@@ -32,15 +25,15 @@ import {
 // 🆕 미들웨어 import 추가
 import { rateLimitSend, rateLimitVerify } from "../middlewares/rateLimit";
 import { withIdempotency } from "../middlewares/idempotency";
-import { checkAndMarkCooldown, fetchOtp } from "../lib/otpService";
+// checkAndMarkCooldown은 이미 위에서 import됨
 import { setAuthCookies, accessCookieOptions } from "../lib/cookies";
 
 // 🆕 환경변수 상수 추가
-const TTL = readIntFromEnv("OTP_TTL", 300); // 5분
-const PHONE_LIMIT = readIntFromEnv("OTP_RATE_PER_PHONE", 5);
-const PHONE_WIN = readIntFromEnv("OTP_RATE_PHONE_WINDOW", 600); // 10분
-const IP_LIMIT = readIntFromEnv("OTP_RATE_PER_IP", 20);
-const IP_WIN = readIntFromEnv("OTP_RATE_IP_WINDOW", 3600); // 1시간
+const TTL = 300; // 5분
+const PHONE_LIMIT = 5;
+const PHONE_WIN = 600; // 10분
+const IP_LIMIT = 20;
+const IP_WIN = 3600; // 1시간
 
 export const authRouter = Router();
 
@@ -96,8 +89,11 @@ authRouter.post("/send-sms",
     // 🚨 레이트리밋은 미들웨어에서 처리됨 (rateLimitSend)
     
     // 재전송 쿨다운 체크
+    console.log(`[auth.mvp] 쿨다운 체크 시작: ${phone}`);
     const cd = await checkAndMarkCooldown(phone);
+    console.log(`[auth.mvp] 쿨다운 체크 결과:`, cd);
     if (cd.blocked) {
+      console.log(`[auth.mvp] 쿨다운에 걸림: ${phone}, retryAfter: ${cd.retryAfter}`);
       return res.status(429).json({
         success: false,
         code: "RESEND_BLOCKED",
@@ -106,10 +102,13 @@ authRouter.post("/send-sms",
         requestId: (req as any).requestId ?? null,
       });
     }
+    console.log(`[auth.mvp] 쿨다운 통과: ${phone}`);
 
     // OTP 코드 생성 및 저장
     const code = "" + Math.floor(100000 + Math.random() * 900000);
-    await setOtp(phone, code, TTL);
+    console.log(`[auth.mvp] issueOtp 호출 전: ${phone}, code: ${code}, context: register`);
+    const issueResult = await issueOtp(phone, code, "register");
+    console.log(`[auth.mvp] issueOtp 결과:`, issueResult);
 
     // 성공 시 레이트리밋 헤더 설정 (간단한 형태)
     res.set({
@@ -202,13 +201,21 @@ authRouter.post("/resend-sms",
       });
     }
 
-    // 쿨다운 설정 (1분)
-    const cooldownKey = `otp:cooldown:${phone}`;
-    await setOtp(cooldownKey, "1", 60);
+    // 쿨다운 체크 및 설정
+    const cooldownPassed = await checkAndMarkCooldown(phone, "register", 60);
+    if (!cooldownPassed) {
+      return res.status(429).json({
+        success: false,
+        code: "RATE_LIMITED",
+        message: "재전송 쿨다운 중입니다.",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
 
     // OTP 코드 생성 및 저장
     const code = "" + Math.floor(100000 + Math.random() * 900000);
-    await setOtp(phone, code, TTL);
+    await issueOtp(phone, code, "register");
 
     // 개발 환경에서만 코드 표시
     const isDev = process.env.NODE_ENV !== "production";
@@ -264,44 +271,57 @@ authRouter.post("/verify-code",
       });
     }
 
-    // OTP 검증 (만료 체크 포함)
-    const otpData = await fetchOtp(phone);
-    console.log(`[DEBUG] OTP 검증: ${phone}, exists: ${otpData.exists}, expired: ${otpData.expired}, ttl: ${otpData.ttl}`);
-    
-    if (!otpData.exists) {
-      // 🆕 메트릭: OTP 검증 실패 (코드 만료)
-      recordOtpVerify("fail", "EXPIRED");
+    // OTP 검증 (강화된 예외 처리)
+    let otpData;
+    try {
+      otpData = await fetchOtp(phone);
+      console.log(`[DEBUG] OTP 검증: ${phone}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
+      
+      if (!otpData?.exists) {
+        // 🆕 메트릭: OTP 검증 실패 (코드 만료)
+        recordOtpVerify("fail", "EXPIRED");
 
-      return res.status(410).json({
+        return res.status(410).json({
+          success: false,
+          code: "EXPIRED",
+          message: "인증번호가 만료되었습니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      if (otpData?.expired) {
+        // 🆕 메트릭: OTP 검증 실패 (코드 만료)
+        recordOtpVerify("fail", "EXPIRED");
+
+        return res.status(410).json({
+          success: false,
+          code: "EXPIRED",
+          message: "인증번호가 만료되었습니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+
+      if (otpData?.code !== code) {
+        // 🆕 메트릭: OTP 검증 실패 (잘못된 코드)
+        recordOtpVerify("fail", "INVALID_CODE");
+
+        return res.status(401).json({
+          success: false,
+          code: "INVALID_CODE",
+          message: "잘못된 인증번호입니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+      
+    } catch (otpError) {
+      console.error(`[auth] OTP fetch error for ${phone}:`, otpError);
+      return res.status(500).json({
         success: false,
-        code: "EXPIRED",
-        message: "인증번호가 만료되었습니다.",
-        data: null,
-        requestId: (req as any).requestId ?? null,
-      });
-    }
-
-    if (otpData.expired) {
-      // 🆕 메트릭: OTP 검증 실패 (코드 만료)
-      recordOtpVerify("fail", "EXPIRED");
-
-      return res.status(410).json({
-        success: false,
-        code: "EXPIRED",
-        message: "인증번호가 만료되었습니다.",
-        data: null,
-        requestId: (req as any).requestId ?? null,
-      });
-    }
-
-    if (otpData.code !== code) {
-      // 🆕 메트릭: OTP 검증 실패 (잘못된 코드)
-      recordOtpVerify("fail", "INVALID_CODE");
-
-      return res.status(401).json({
-        success: false,
-        code: "INVALID_CODE",
-        message: "잘못된 인증번호입니다.",
+        code: "INTERNAL_ERROR",
+        message: "서버 내부 오류",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
@@ -330,17 +350,17 @@ authRouter.post("/verify-code",
       // 가입 티켓을 Redis에 저장 (30분 TTL)
       try {
         console.log(`[DEBUG] setOtp 호출 시작: ${ticketKey}`);
-        await setOtp(ticketKey, JSON.stringify(ticketData), 1800);
+        await setOtp(ticketKey, JSON.stringify(ticketData), "ticket", 1800);
         console.log(`[DEBUG] setOtp 호출 완료: ${ticketKey}`);
         
         // 생성 확인 (기존 기능 보존)
         console.log(`[DEBUG] 티켓 생성 확인 시작: ${ticketKey}`);
-        const verifyTicket = await getOtp(ticketKey);
-        console.log(`[DEBUG] getOtp 결과: ${ticketKey} = ${verifyTicket ? '존재' : '없음'}`);
-        
-        if (verifyTicket) {
+        const verifyTicketResult = await getOtp(ticketKey, "ticket");
+        console.log(`[DEBUG] getOtp 결과: ${ticketKey} = ${verifyTicketResult.code ? '존재' : '없음'}`);
+
+        if (verifyTicketResult.code) {
           console.log(`[DEBUG] 가입 티켓 생성 확인됨: ${ticketKey}`);
-          console.log(`[DEBUG] 티켓 내용:`, verifyTicket);
+          console.log(`[DEBUG] 티켓 내용:`, verifyTicketResult.code);
         } else {
           console.warn(`[WARN] 가입 티켓 생성 후 확인 실패: ${ticketKey}`);
         }
@@ -450,7 +470,7 @@ authRouter.post("/test/expire-otp", async (req: Request, res: Response, next: Ne
     }
 
     // OTP 강제 만료 (TTL을 1초로 설정)
-    await setOtp(phone, "EXPIRED", 1);
+    await setOtp(phone, "EXPIRED", "register", 1);
 
     console.log(`[TEST] OTP 강제 만료: ${phone}`);
 
@@ -487,24 +507,26 @@ authRouter.post("/signup",
       });
     }
 
-    // OTP 재검증
-    const storedCode = await getOtp(phone);
-
-    if (!storedCode) {
-      return res.status(410).json({
+    // OTP 검증
+    try {
+      const verifyResult = await verifyOtp(phone, code, "register");
+      
+      if (!verifyResult.ok) {
+        const status = verifyResult.code === "EXPIRED" ? 410 : 401;
+        return res.status(status).json({
+          success: false,
+          code: verifyResult.code,
+          message: verifyResult.code === "EXPIRED" ? "인증번호가 만료되었습니다." : "잘못된 OTP 코드입니다.",
+          data: null,
+          requestId: (req as any).requestId ?? null,
+        });
+      }
+    } catch (error) {
+      console.error(`[auth] OTP verify error for ${phone}:`, error);
+      return res.status(500).json({
         success: false,
-        code: "EXPIRED",
-        message: "인증번호가 만료되었습니다.",
-        data: null,
-        requestId: (req as any).requestId ?? null,
-      });
-    }
-
-    if (storedCode !== code) {
-      return res.status(401).json({
-        success: false,
-        code: "INVALID_CODE",
-        message: "잘못된 인증번호입니다.",
+        code: "INTERNAL_ERROR",
+        message: "서버 내부 오류",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
@@ -512,9 +534,20 @@ authRouter.post("/signup",
 
     // 가입 티켓 확인
     const ticketKey = `reg:ticket:${phone}`;
-    const ticketData = await getOtp(ticketKey);
+    const ticketDataResult = await getOtp(ticketKey, "ticket");
 
-    if (!ticketData) {
+    if (ticketDataResult.error) {
+      console.error(`[auth] Ticket get error for ${phone}:`, ticketDataResult.error);
+      return res.status(500).json({
+        success: false,
+        code: "INTERNAL_ERROR",
+        message: "서버 내부 오류",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    if (!ticketDataResult.code) {
       return res.status(400).json({
         success: false,
         code: "REGISTRATION_EXPIRED",
