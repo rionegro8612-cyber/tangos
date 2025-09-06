@@ -4,9 +4,12 @@ let client: RedisClientType | null = null;
 let connecting: Promise<any> | null = null;
 
 export function getRedis(): RedisClientType {
-  if (client) return client;
+  if (client && client.isOpen) return client;
   client = createClient({ url: process.env.REDIS_URL ?? "redis://localhost:6379" });
   client.on("error", (err) => console.error("[Redis] error:", err));
+  client.on("connect", () => console.log("[Redis] connected"));
+  client.on("ready", () => console.log("[Redis] ready"));
+  client.on("end", () => console.log("[Redis] connection ended"));
   return client;
 }
 

@@ -3,13 +3,8 @@ import { validate } from "../middlewares/validate";
 import { SubmitSchema } from "./register.schemas";
 import { AppError, ErrorCodes } from "../errors/AppError";
 import { withIdempotency } from "../middlewares/idempotency";
-import { createClient } from "redis";
+import { ensureRedis, redis } from "../lib/redis";
 import dayjs from "dayjs";
-
-// Redis 클라이언트
-const redis = createClient({
-  url: process.env.REDIS_URL || "redis://redis:6379",
-});
 
 export const registerRouter = Router();
 
@@ -40,7 +35,8 @@ registerRouter.post("/start", async (req, res) => {
       status: "started",
     };
 
-    await redis.setex(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
+    const redis = await ensureRedis();
+    await redis.setEx(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
 
     // 2) { requestId, ttlSec } 등 표준 응답
     return res.json({
@@ -83,7 +79,8 @@ registerRouter.post("/verify", async (req, res) => {
     }
 
     // OTP 검증
-    const storedCode = await redis.get(phone);
+    const { getOtp } = await import("../services/otp.redis");
+    const storedCode = await getOtp(phone);
     if (!storedCode || storedCode !== code) {
       return res.status(401).json({
         success: false,
@@ -104,11 +101,13 @@ registerRouter.post("/verify", async (req, res) => {
       session.verifiedAt = new Date().toISOString();
       session.status = "verified";
 
-      await redis.setex(sessionKey, 1800, JSON.stringify(session));
+      const redis = await ensureRedis();
+      await redis.setEx(sessionKey, 1800, JSON.stringify(session));
     }
 
     // OTP 코드 삭제
-    await redis.del(phone);
+    const { delOtp } = await import("../services/otp.redis");
+    await delOtp(phone);
 
     // 🚨 회원가입 티켓 생성 (register.submit에서 필요)
     const ticketKey = `reg:ticket:${phone}`;
@@ -122,7 +121,8 @@ registerRouter.post("/verify", async (req, res) => {
     console.log(`[DEBUG] 가입 티켓 생성 시도: ${ticketKey}`, ticketData);
     
     try {
-      await redis.setex(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
+      const redis = await ensureRedis();
+      await redis.setEx(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
       console.log(`[DEBUG] 가입 티켓 생성 성공: ${ticketKey}`);
       
       // 생성 확인
@@ -174,6 +174,7 @@ registerRouter.post("/complete", async (req, res) => {
 
     // 세션 확인
     const sessionKey = `reg:session:${phone}`;
+    const redis = await ensureRedis();
     const sessionData = await redis.get(sessionKey);
 
     if (!sessionData) {
