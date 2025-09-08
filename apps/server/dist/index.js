@@ -11,11 +11,19 @@ if (process.env.NODE_ENV !== "test") {
     const port = Number(process.env.PORT) || 4100;
     console.log(`[env] PORT=${process.env.PORT ?? "(undefined)"} → use ${port}`);
     (async () => {
-        await (0, redis_1.ensureRedis)();
-        app_1.default.listen(port, () => {
-            console.log(`[server] listening on http://localhost:${port}`);
-            console.log("=== SERVER STARTED ===", new Date().toISOString());
-            (0, cleanup_1.setupCleanupScheduler)();
-        });
+        try {
+            // Redis 연결 보장 - 실패 시 서버 시작 중단
+            await (0, redis_1.assertRedisReady)();
+            console.log("✅ Redis connection verified");
+            app_1.default.listen(port, () => {
+                console.log(`[server] listening on http://localhost:${port}`);
+                console.log("=== SERVER STARTED ===", new Date().toISOString());
+                (0, cleanup_1.setupCleanupScheduler)();
+            });
+        }
+        catch (e) {
+            console.error("🚫 Redis not ready. Abort start.", e);
+            process.exit(1);
+        }
     })();
 }

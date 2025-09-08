@@ -3,7 +3,7 @@ import { newJti, signAccessToken, signRefreshToken } from "../lib/jwt";
 import { setAuthCookies } from "../lib/cookies";
 // // import { saveNewRefreshToken } from "../repos/refreshTokenRepo"; // 임시 비활성화 // 임시 비활성화
 import { findByPhone, getUserProfile } from "../repos/userRepo";
-import { getOtp, delOtp, setOtp } from "../services/otp.redis";
+import { getOtp, delOtp, setOtp } from "../services/otp.service";
 import authJwt from "../middlewares/authJwt";
 import { normalizeE164 } from "../lib/phone";
 import { recordOtpSend, recordOtpVerify, recordUserLogin } from "../lib/metrics";

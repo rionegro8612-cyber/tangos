@@ -3,32 +3,8 @@ import { validate } from "../middlewares/validate";
 import { SubmitSchema } from "./register.schemas";
 import { AppError, ErrorCodes } from "../errors/AppError";
 import { withIdempotency } from "../middlewares/idempotency";
-import { createClient } from "redis";
+import { getRedis } from "../lib/redis";
 import dayjs from "dayjs";
-
-// Redis 클라이언트
-const redis = createClient({
-  url: process.env.REDIS_URL || "redis://localhost:6379",
-});
-
-// Redis 연결 상태 확인 및 연결
-redis.on('error', (err) => console.error('Redis Client Error:', err));
-redis.on('connect', () => console.log('Redis Client Connected'));
-redis.on('ready', () => console.log('Redis Client Ready'));
-redis.on('end', () => console.log('Redis Client Disconnected'));
-
-// Redis 연결 상태 확인 함수 (필요할 때만 연결)
-const ensureRedisConnection = async () => {
-  if (!redis.isOpen) {
-    try {
-      await redis.connect();
-      console.log('Redis reconnected');
-    } catch (error) {
-      console.error('Redis reconnection failed:', error);
-    }
-  }
-  return redis.isOpen;
-};
 
 const router = Router();
 
@@ -39,8 +15,8 @@ router.post("/submit", withIdempotency(), validate(SubmitSchema), async (req, re
   console.log(`[ROUTER DEBUG] /auth/register/submit 요청 처리 시작 - register.submit.ts`);
   
   try {
-    // Redis 연결 보장
-    await ensureRedisConnection();
+    // Redis 클라이언트 획득
+    const redis = getRedis();
     
     const { profile, agreements, referralCode } = req.body;
 
@@ -64,16 +40,8 @@ router.post("/submit", withIdempotency(), validate(SubmitSchema), async (req, re
       if (ticket) {
         console.log(`[DEBUG] 티켓 내용:`, ticket);
       } else {
-        // setOtp로 생성된 키를 getOtp로 조회 시도
-        console.log(`[DEBUG] Redis get 실패, getOtp로 재시도: ${ticketKey}`);
-        const { getOtp } = await import('../services/otp.redis');
-        const otpTicket = await getOtp(ticketKey);
-        console.log(`[DEBUG] getOtp 결과: ${ticketKey} = ${otpTicket ? '존재' : '없음'}`);
-        
-        if (otpTicket) {
-          ticket = otpTicket;
-          console.log(`[DEBUG] getOtp로 티켓 찾음:`, otpTicket);
-        }
+        // 티켓이 없으면 에러 (기존 기능 보존)
+        console.log(`[DEBUG] 티켓을 찾을 수 없음: ${ticketKey}`);
       }
     } catch (error) {
       console.error('Redis get error:', error);
@@ -115,7 +83,6 @@ router.post("/submit", withIdempotency(), validate(SubmitSchema), async (req, re
 
     // 4) 가입 티켓 소멸
     try {
-      await ensureRedisConnection();
       await redis.del(ticketKey);
       console.log(`[DEBUG] 가입 티켓 삭제 성공: ${ticketKey}`);
     } catch (error) {

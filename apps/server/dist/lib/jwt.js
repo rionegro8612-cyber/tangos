@@ -10,6 +10,8 @@ exports.signAccessToken = signAccessToken;
 exports.signRefreshToken = signRefreshToken;
 exports.verifyAccessToken = verifyAccessToken;
 exports.verifyRefreshToken = verifyRefreshToken;
+exports.verifyAccessTokenOrThrow = verifyAccessTokenOrThrow;
+exports.isUuidOrInt = isUuidOrInt;
 // apps/server/src/lib/jwt.ts
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
@@ -54,3 +56,19 @@ function verifyRefreshToken(token) {
 /** ───── 호환성 alias (기존 코드가 참조해도 깨지지 않게) ───── */
 exports.signAccess = signAccessToken;
 exports.verifyToken = verifyAccessToken;
+/** 공용 토큰 검증 함수 (숫자/UUID 모두 허용, 같은 시크릿) */
+function verifyAccessTokenOrThrow(token) {
+    const p = jsonwebtoken_1.default.verify(token, SECRET); // ← **같은 시크릿**
+    const uid = String(p?.uid ?? p?.sub ?? "");
+    if (!isUuidOrInt(uid))
+        throw new Error("invalid uid");
+    return { uid };
+}
+/** UUID 또는 정수형 ID 검증 */
+function isUuidOrInt(v) {
+    // 정수형 ID 검증: 1자리 이상의 숫자
+    if (/^\d+$/.test(v))
+        return true;
+    // UUID 검증
+    return /^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[1-5][0-9a-fA-F-]{3}-[89abAB][0-9a-fA-F-]{3}-[0-9a-fA-F-]{12}$/.test(v);
+}

@@ -2,11 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.rateLimitVerify = exports.rateLimitSend = void 0;
 const AppError_1 = require("../errors/AppError");
-const redis_1 = require("redis");
-// Redis 클라이언트 (기존 설정 재사용)
-const redis = (0, redis_1.createClient)({
-    url: process.env.REDIS_URL || "redis://redis:6379",
-});
+const redis_1 = require("../lib/redis");
 // 레이트 리밋 설정
 const RATE_LIMITS = {
     send: {
@@ -25,9 +21,10 @@ const RATE_LIMITS = {
 };
 // 레이트 리밋 체크 함수
 async function checkRateLimit(key, limit, window) {
-    const current = await redis.incr(key);
+    const redisClient = await (0, redis_1.ensureRedis)();
+    const current = await redisClient.incr(key);
     if (current === 1) {
-        await redis.expire(key, window);
+        await redisClient.expire(key, window);
     }
     const remaining = Math.max(0, limit - current);
     const resetTime = Date.now() + window * 1000;
@@ -66,7 +63,8 @@ const rateLimitSend = async (req, res, next) => {
         }
         // 쿨다운 체크 (재전송 방지)
         const cooldownKey = `cooldown:send:phone:${phone}`;
-        const cooldown = await redis.get(cooldownKey);
+        const redisClient = await (0, redis_1.ensureRedis)();
+        const cooldown = await redisClient.get(cooldownKey);
         if (cooldown) {
             const cooldownTime = Number(cooldown);
             const remainingCooldown = Math.ceil((cooldownTime + RATE_LIMITS.send.cooldown * 1000 - Date.now()) / 1000);
@@ -75,7 +73,7 @@ const rateLimitSend = async (req, res, next) => {
             }
         }
         // 쿨다운 설정 (현재 시간을 저장)
-        await redis.setex(cooldownKey, RATE_LIMITS.send.cooldown, Date.now().toString());
+        await redisClient.setex(cooldownKey, RATE_LIMITS.send.cooldown, Date.now().toString());
         next();
     }
     catch (error) {

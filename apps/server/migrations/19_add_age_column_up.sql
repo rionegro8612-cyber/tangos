@@ -9,3 +9,5 @@ COMMENT ON COLUMN users.age IS '사용자 나이';
 
 
 
+
+

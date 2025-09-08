@@ -6,8 +6,10 @@ function makeRedis(): Redis {
   const url = process.env.REDIS_URL;
   if (url) {
     return new Redis(url, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 3,
       enableReadyCheck: true,
+      lazyConnect: true,
+      keepAlive: 30000,
     });
   }
   return new Redis({
@@ -15,8 +17,10 @@ function makeRedis(): Redis {
     port: Number(process.env.REDIS_PORT || 6379),
     password: process.env.REDIS_PASSWORD || undefined,
     db: Number(process.env.REDIS_DB || 0),
-    maxRetriesPerRequest: 2,
+    maxRetriesPerRequest: 3,
     enableReadyCheck: true,
+    lazyConnect: true,
+    keepAlive: 30000,
   });
 }
 
@@ -29,6 +33,15 @@ export function getRedis(): Redis {
     client.on("end", () => console.warn("⚠️ Redis connection ended"));
   }
   return client;
+}
+
+// Redis 클라이언트 강제 재초기화
+export function resetRedis() {
+  if (client) {
+    client.disconnect();
+    client = null;
+  }
+  console.log("🔄 Redis client reset");
 }
 
 export async function assertRedisReady() {

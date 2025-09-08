@@ -5,6 +5,7 @@ import helmet from "helmet";
 import cors, { CorsOptionsDelegate } from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import { router } from "./routes";
 import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
 import { setupCleanupScheduler } from "./lib/cleanup";
@@ -14,25 +15,6 @@ import metricsMiddleware from "./middlewares/metrics";
 import { getMetrics, getMetricsStatus } from "./lib/metrics";
 import errorHandler from "./middlewares/error";
 import apiRouter from "./routes";
-import { healthRouter } from "./routes/health";
-
-// 🆕 부팅 로그 추가
-console.log('[BOOT] app.ts file =', 'src/app.ts');
-console.log('[BOOT] apiRouter resolved path =', require.resolve('./routes'));
-console.log('[BOOT] healthRouter path =', require.resolve('./routes/health'));
-console.log('[BOOT] communityRouter path =', require.resolve('./routes/community'));
-
-// 🆕 Redis 연결 테스트 (앱 부팅 시 1회 핑)
-(async () => {
-  try {
-    const redis = await ensureRedis();
-    const pong = await redis.ping();
-    console.log("🔌 Redis OK:", pong);
-  } catch (e) {
-    console.error("❌ Redis connect failed:", e);
-    console.error("Redis URL:", process.env.REDIS_URL);
-  }
-})();
 
 const app = express();
 app.disable("x-powered-by");
@@ -182,77 +164,13 @@ app.get("/api/v1/_health", (_req, res) => {
   });
 });
 
-// 🆕 디버그 엔드포인트
-function listRoutes(appOrRouter: any, base = '') {
-  const routes: string[] = [];
-  const stack = appOrRouter?.stack || appOrRouter?._router?.stack || [];
-  for (const layer of stack) {
-    if (layer.route && layer.route.path) {
-      const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
-      routes.push(`${methods.padEnd(6)} ${base}${layer.route.path}`);
-    } else if (layer.name === 'router' && layer.handle?.stack) {
-      const prefix = layer.regexp?.fast_star
-        ? `${base}*`
-        : layer.regexp?.fast_slash
-          ? `${base}/`
-          : (layer.regexp?.toString() || base);
-      routes.push(...listRoutes(layer.handle, base));
-    }
-  }
-  return routes;
-}
-
-app.get('/__whoami', (_req, res) => {
-  res.json({ file: __filename, now: new Date().toISOString() });
-});
-
-app.get('/__routes', (_req, res) => {
-  try {
-    const listRoutes = (layer: any, base = ''): string[] => {
-      const out: string[] = [];
-      const stack = (layer?.stack) || (layer?._router?.stack) || [];
-      for (const l of stack) {
-        if (l.route?.path) {
-          const methods = Object.keys(l.route.methods||{}).map(m=>m.toUpperCase()).join(',');
-          out.push(`${methods.padEnd(6)} ${base}${l.route.path}`);
-        } else if (l.name === 'router' || l.handle?._router) {
-          out.push(...listRoutes(l.handle?._router || l.handle, base)); // prefix 단순화
-        }
-      }
-      return out;
-    };
-    const routes = listRoutes((app as any)._router);
-    res.json({ 
-      count: routes.length, 
-      routes: routes,
-      apiBase: API_BASE,
-      timestamp: new Date().toISOString()
-    });
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
-  }
-});
-
 // ▼ API 라우터 마운트 (가장 중요!)
 const API_BASE = process.env.API_BASE || "/api/v1";
-
-// 베이스 핑을 앱 레벨에서 보장 (라우터와 별개로 항상 응답)
-app.get(`${API_BASE}/_ping`, (_req, res) => {
-  res.type("text/plain").send("pong");
-});
-
-// 1) 가장 먼저 정확 경로로 health만 노출 (넓은 패턴 절대 금지)
-app.use(`${API_BASE}/health`, healthRouter);
-
-// 2) 그 다음에 실제 API 라우터(커뮤니티 포함)
 app.use(API_BASE, apiRouter);
 
 // ▼ 에러 핸들러
 app.use(standardErrorHandler);
 app.use(errorHandler);
-
-// 3) 404 핸들러는 반드시 맨 끝으로 유지
-app.use((_req, res) => res.status(404).json({ success: false, code: 'NOT_FOUND' }));
 
 // 🆕 프로세스 종료 시 트레이싱 정리
 process.on("SIGTERM", () => {
@@ -275,10 +193,10 @@ if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
     // 간단한 방법: apiRouter의 라우트 정보 직접 출력
     console.log("📋 API Router Info:");
     console.log(`- Base path: ${API_BASE}`);
-    console.log(`- Router stack length: ${apiRouter.stack.length}`);
+    console.log(`- Router stack length: ${router.stack.length}`);
 
     // 각 라우터별 정보 출력
-    apiRouter.stack.forEach((layer: any, index: number) => {
+    router.stack.forEach((layer: any, index: number) => {
       if (layer.name === "router") {
         console.log(`- Router ${index + 1}: ${layer.regexp?.source || "unknown"}`);
         if (layer.handle?.stack) {
@@ -286,28 +204,6 @@ if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
         }
       }
     });
-
-    // 실제 등록된 라우트들을 상세히 출력
-    console.log("\n📋 Detailed Route List:");
-    const routeList: string[] = [];
-    
-    const extractRoutes = (router: any, basePath: string = "") => {
-      if (router.stack) {
-        router.stack.forEach((layer: any) => {
-          if (layer.route) {
-            const methods = Object.keys(layer.route.methods).join(",").toUpperCase();
-            const path = `${API_BASE}${basePath}${layer.route.path}`;
-            routeList.push(`${methods.padEnd(6)} ${path}`);
-          } else if (layer.name === "router") {
-            const subPath = layer.regexp?.source?.replace(/\\\//g, "/").replace(/\^|\$|\\/g, "") || "";
-            extractRoutes(layer.handle, basePath + subPath);
-          }
-        });
-      }
-    };
-    
-    extractRoutes(apiRouter);
-    routeList.forEach(route => console.log(route));
 
     console.log("\n🔍 Manual route check:");
     console.log("GET  /api/v1/_ping");

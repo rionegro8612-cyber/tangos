@@ -106,8 +106,8 @@ authRouter.post("/send-sms",
 
     // OTP 코드 생성 및 저장
     const code = "" + Math.floor(100000 + Math.random() * 900000);
-    console.log(`[auth.mvp] issueOtp 호출 전: ${phone}, code: ${code}, context: register`);
-    const issueResult = await issueOtp(phone, code, "register");
+    console.log(`[auth.mvp] issueOtp 호출 전: ${phone}, code: ${code}, context: ${context}`);
+    const issueResult = await issueOtp(phone, code, context);
     console.log(`[auth.mvp] issueOtp 결과:`, issueResult);
 
     // 성공 시 레이트리밋 헤더 설정 (간단한 형태)
@@ -274,7 +274,7 @@ authRouter.post("/verify-code",
     // OTP 검증 (강화된 예외 처리)
     let otpData;
     try {
-      otpData = await fetchOtp(phone);
+      otpData = await fetchOtp(phone, context);
       console.log(`[DEBUG] OTP 검증: ${phone}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
       
       if (!otpData?.exists) {
@@ -328,7 +328,7 @@ authRouter.post("/verify-code",
     }
 
     // OTP 사용 후 삭제
-    await delOtp(phone);
+    await delOtp(phone, context);
 
     // 사용자 존재 여부 확인 (isNew 필드 결정)
     const existingUser = await findByPhone(phone);

@@ -42,17 +42,17 @@ async function getUserProfile(userId) {
       age                   AS age,
       created_at            AS "createdAt"
     FROM users
-    WHERE id = $1::uuid
+    WHERE id = $1::integer
     `, [userId]);
     return rows[0] ?? null;
 }
 /** 마지막 로그인 시각만 갱신 */
 async function touchLastLogin(userId) {
-    await (0, db_1.query)(`UPDATE users SET last_login_at = NOW() WHERE id = $1::uuid`, [userId]);
+    await (0, db_1.query)(`UPDATE users SET last_login_at = NOW() WHERE id = $1::integer`, [userId]);
 }
 /** 닉네임 업데이트 (존재 보장 위해 RETURNING) */
 async function updateUserNickname(userId, nickname) {
-    const rows = await (0, db_1.query)(`UPDATE users SET nickname = $2 WHERE id = $1::uuid RETURNING id`, [userId, nickname]);
+    const rows = await (0, db_1.query)(`UPDATE users SET nickname = $2 WHERE id = $1::integer RETURNING id`, [userId, nickname]);
     return rows.length > 0;
 }
 async function updateKycStatus(userId, provider) {
@@ -60,7 +60,7 @@ async function updateKycStatus(userId, provider) {
        SET kyc_verified = TRUE,
            kyc_provider = $1,
            kyc_checked_at = NOW()
-     WHERE id = $2::uuid`, [provider, userId]);
+     WHERE id = $2::integer`, [provider, userId]);
 }
 async function findByPhone(phone) {
     const rows = await (0, db_1.query)(`SELECT id FROM users WHERE phone_e164_norm = $1`, [

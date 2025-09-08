@@ -1,16 +1,45 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerRouter = void 0;
 const express_1 = require("express");
-const redis_1 = require("redis");
+const redis_1 = require("../lib/redis");
 const dayjs_1 = __importDefault(require("dayjs"));
-// Redis 클라이언트
-const redis = (0, redis_1.createClient)({
-    url: process.env.REDIS_URL || "redis://redis:6379",
-});
 exports.registerRouter = (0, express_1.Router)();
 // KYC 최소 나이 제한
 const KYC_MIN_AGE = Number(process.env.KYC_MIN_AGE) || 50;
@@ -35,6 +64,7 @@ exports.registerRouter.post("/start", async (req, res) => {
             startedAt: new Date().toISOString(),
             status: "started",
         };
+        const redis = await (0, redis_1.ensureRedis)();
         await redis.setex(sessionKey, 1800, JSON.stringify(sessionData)); // 30분 유효
         // 2) { requestId, ttlSec } 등 표준 응답
         return res.json({
@@ -74,29 +104,63 @@ exports.registerRouter.post("/verify", async (req, res) => {
                 requestId: req.requestId ?? null,
             });
         }
-        // OTP 검증
-        const storedCode = await redis.get(phone);
-        if (!storedCode || storedCode !== code) {
-            return res.status(401).json({
+        // OTP 검증 (강화된 예외 처리)
+        try {
+            const { verifyOtp } = await Promise.resolve().then(() => __importStar(require("../services/otp.service")));
+            const verifyResult = await verifyOtp(phone, code, "register");
+            if (!verifyResult.ok) {
+                console.log(`[register] OTP verification failed for ${phone}: ${verifyResult.code}`);
+                if (verifyResult.code === "EXPIRED") {
+                    return res.status(401).json({
+                        success: false,
+                        code: "EXPIRED_CODE",
+                        message: "인증번호가 만료되었습니다.",
+                        data: null,
+                        requestId: req.requestId ?? null,
+                    });
+                }
+                return res.status(401).json({
+                    success: false,
+                    code: "INVALID_CODE",
+                    message: "인증번호가 올바르지 않습니다.",
+                    data: null,
+                    requestId: req.requestId ?? null,
+                });
+            }
+            console.log(`[register] OTP verification success for ${phone}`);
+        }
+        catch (otpError) {
+            console.error(`[register] OTP verification exception for ${phone}:`, otpError);
+            return res.status(500).json({
                 success: false,
-                code: "INVALID_CODE",
-                message: "인증번호가 올바르지 않습니다.",
+                code: "INTERNAL_ERROR",
+                message: "서버 내부 오류",
                 data: null,
                 requestId: req.requestId ?? null,
             });
         }
         // 1) OTP 검증 → signup_sessions.phone_verified = true
-        const sessionKey = `reg:session:${phone}`;
-        const sessionData = await redis.get(sessionKey);
-        if (sessionData) {
-            const session = JSON.parse(sessionData);
-            session.phoneVerified = true;
-            session.verifiedAt = new Date().toISOString();
-            session.status = "verified";
-            await redis.setex(sessionKey, 1800, JSON.stringify(session));
+        try {
+            const sessionKey = `reg:session:${phone}`;
+            const redisClient = await (0, redis_1.ensureRedis)();
+            const sessionData = await redisClient.get(sessionKey);
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                session.phoneVerified = true;
+                session.verifiedAt = new Date().toISOString();
+                session.status = "verified";
+                await redisClient.setex(sessionKey, 1800, JSON.stringify(session));
+                console.log(`[register] Session updated for ${phone}: phoneVerified=true`);
+            }
+            else {
+                console.log(`[register] No session found for ${phone}`);
+            }
+            // OTP는 이미 verifyOtp에서 삭제됨
         }
-        // OTP 코드 삭제
-        await redis.del(phone);
+        catch (redisError) {
+            console.error(`[register] Redis operation failed for ${phone}:`, redisError);
+            // Redis 오류가 있어도 OTP 검증은 성공으로 처리 (이미 검증됨)
+        }
         // 🚨 회원가입 티켓 생성 (register.submit에서 필요)
         const ticketKey = `reg:ticket:${phone}`;
         const ticketData = {
@@ -107,6 +171,7 @@ exports.registerRouter.post("/verify", async (req, res) => {
         };
         console.log(`[DEBUG] 가입 티켓 생성 시도: ${ticketKey}`, ticketData);
         try {
+            const redis = await (0, redis_1.ensureRedis)();
             await redis.setex(ticketKey, 1800, JSON.stringify(ticketData)); // 30분 유효
             console.log(`[DEBUG] 가입 티켓 생성 성공: ${ticketKey}`);
             // 생성 확인
@@ -156,6 +221,7 @@ exports.registerRouter.post("/complete", async (req, res) => {
         }
         // 세션 확인
         const sessionKey = `reg:session:${phone}`;
+        const redis = await (0, redis_1.ensureRedis)();
         const sessionData = await redis.get(sessionKey);
         if (!sessionData) {
             return res.status(401).json({

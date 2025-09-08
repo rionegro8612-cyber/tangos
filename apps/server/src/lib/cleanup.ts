@@ -76,8 +76,8 @@ export function setupCleanupScheduler() {
     },
   );
 
-  // 개발 환경에서는 5분마다 실행 (테스트용)
-  if (process.env.NODE_ENV === "development") {
+  // 개발 환경에서는 5분마다 실행 (테스트용) - 임시 비활성화
+  if (process.env.NODE_ENV === "development" && process.env.DISABLE_CLEANUP !== "true") {
     cron.schedule("*/5 * * * *", async () => {
       console.log("[cleanup] 개발환경 정리 작업 시작");
       await cleanupExpiredOtpCodes();

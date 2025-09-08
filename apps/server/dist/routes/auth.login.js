@@ -42,7 +42,7 @@ const jwt_1 = require("../lib/jwt");
 const cookies_1 = require("../lib/cookies");
 // // import { saveNewRefreshToken } from "../repos/refreshTokenRepo"; // 임시 비활성화 // 임시 비활성화
 const userRepo_1 = require("../repos/userRepo");
-const otp = __importStar(require("../otpStore"));
+const otp_service_1 = require("../services/otp.service");
 const authJwt_1 = __importDefault(require("../middlewares/authJwt"));
 const phone_1 = require("../lib/phone");
 const metrics_1 = require("../lib/metrics");
@@ -62,8 +62,8 @@ exports.loginRouter.post("/send-sms", async (req, res) => {
         const userId = await findOrCreateUserByPhoneE164(e164);
         user = { id: userId };
     }
-    const code = otp.generateCode();
-    otp.putCode(e164, code, "login");
+    const code = "" + Math.floor(100000 + Math.random() * 900000);
+    await (0, otp_service_1.setOtp)(e164, code, "login", 300); // 5분 TTL
     // send via SMS vendor (mock in dev by default)
     if (process.env.NODE_ENV !== "test") {
         // SMS 전송 로직 (현재는 콘솔 출력)
@@ -76,18 +76,20 @@ exports.loginRouter.post("/send-sms", async (req, res) => {
 });
 // 로그인 OTP 검증 + 세션 발급
 exports.loginRouter.post("/verify-login", async (req, res) => {
-    const { phone, code } = req.body ?? {};
-    if (!phone || !code)
-        return res.fail("VAL_400", "phone, code 필수", 400);
+    const { phone, otp } = req.body ?? {};
+    if (!phone || !otp)
+        return res.fail("VAL_400", "phone, otp 필수", 400);
     const e164 = (0, phone_1.normalizeE164)(phone);
-    const ok = otp.verifyCode(e164, code, "login");
-    if (!ok) {
+    const storedCode = await (0, otp_service_1.getOtp)(e164);
+    if (!storedCode || storedCode !== otp) {
         // 🆕 메트릭: OTP 검증 실패
         (0, metrics_1.recordOtpVerify)("fail", "INVALID_CODE");
         return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
     }
     // 🆕 메트릭: OTP 검증 성공
     (0, metrics_1.recordOtpVerify)("success", "VALID_CODE");
+    // OTP 코드 삭제
+    await (0, otp_service_1.delOtp)(e164);
     const user = await (0, userRepo_1.findByPhone)(e164);
     if (!user)
         return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -114,14 +116,16 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
     if (!phone || !code)
         return res.fail("VAL_400", "phone, code 필수", 400);
     const e164 = (0, phone_1.normalizeE164)(phone);
-    const ok = otp.verifyCode(e164, code, "login");
-    if (!ok) {
+    const storedCode = await (0, otp_service_1.getOtp)(e164);
+    if (!storedCode || storedCode !== code) {
         // 🆕 메트릭: OTP 검증 실패
         (0, metrics_1.recordOtpVerify)("fail", "INVALID_CODE");
         return res.fail("INVALID_CODE", "인증번호가 올바르지 않거나 만료되었습니다.", 401);
     }
     // 🆕 메트릭: OTP 검증 성공
     (0, metrics_1.recordOtpVerify)("success", "VALID_CODE");
+    // OTP 코드 삭제
+    await (0, otp_service_1.delOtp)(e164);
     const user = await (0, userRepo_1.findByPhone)(e164);
     if (!user)
         return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);

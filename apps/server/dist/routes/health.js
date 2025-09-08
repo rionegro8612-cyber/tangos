@@ -6,10 +6,16 @@ const express_1 = require("express");
 const health_1 = require("../lib/health");
 exports.healthRouter = (0, express_1.Router)();
 /**
- * GET /_ping - 기본 헬스체크 (기존 호환성 유지)
+ * GET / - 기본 헬스체크 (정확한 경로만 매칭)
+ */
+exports.healthRouter.get("/", (_req, res) => {
+    res.json({ success: true, code: "OK", message: "healthy" });
+});
+/**
+ * GET /_ping - 핑 엔드포인트
  */
 exports.healthRouter.get("/_ping", (_req, res) => {
-    res.json({ ok: true });
+    res.status(200).type("text/plain").send("pong");
 });
 /**
  * GET /livez - Kubernetes liveness probe

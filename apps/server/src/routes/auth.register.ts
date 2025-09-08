@@ -80,17 +80,17 @@ registerRouter.post("/verify", async (req, res) => {
 
     // OTP 검증 (강화된 예외 처리)
     try {
-      const { verifyOtp } = await import("../services/otp.redis");
+      const { verifyOtp } = await import("../services/otp.service");
       const verifyResult = await verifyOtp(phone, code, "register");
       
       if (!verifyResult.ok) {
-        console.log(`[register] OTP verification failed for ${phone}: ${verifyResult.reason}`);
+        console.log(`[register] OTP verification failed for ${phone}: ${verifyResult.code}`);
         
-        if (verifyResult.reason === "INTERNAL_ERROR") {
-          return res.status(500).json({
+        if (verifyResult.code === "EXPIRED") {
+          return res.status(401).json({
             success: false,
-            code: "INTERNAL_ERROR",
-            message: "서버 내부 오류",
+            code: "EXPIRED_CODE",
+            message: "인증번호가 만료되었습니다.",
             data: null,
             requestId: (req as any).requestId ?? null,
           });
@@ -98,8 +98,8 @@ registerRouter.post("/verify", async (req, res) => {
         
         return res.status(401).json({
           success: false,
-          code: verifyResult.reason === "EXPIRED_OR_NOT_FOUND" ? "EXPIRED_CODE" : "INVALID_CODE",
-          message: verifyResult.reason === "EXPIRED_OR_NOT_FOUND" ? "인증번호가 만료되었습니다." : "인증번호가 올바르지 않습니다.",
+          code: "INVALID_CODE",
+          message: "인증번호가 올바르지 않습니다.",
           data: null,
           requestId: (req as any).requestId ?? null,
         });
