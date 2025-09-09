@@ -32,6 +32,13 @@ export function getRedis(): Redis {
     client.on("error", (e) => console.error("❌ Redis error:", e?.message || e));
     client.on("end", () => console.warn("⚠️ Redis connection ended"));
   }
+  
+  // 연결 상태 확인 및 강제 연결
+  if (!client.status || client.status === 'end') {
+    console.log("🔄 Redis 재연결 시도...");
+    client.connect();
+  }
+  
   return client;
 }
 

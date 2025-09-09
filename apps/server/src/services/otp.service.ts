@@ -4,10 +4,28 @@ const OTP_TTL_SEC = 300;
 const OTP_PREFIX  = "otp";
 const CD_PREFIX   = "otp:cooldown";
 
-const normalizePhone = (e164: string) => e164.replace(/\s+/g, "");
+const normalizePhone = (phone: string) => {
+  // 이미 +82로 시작하는 경우 그대로 반환
+  if (phone.startsWith("+82")) {
+    return phone;
+  }
+  
+  const digits = phone.replace(/\D/g, ""); // 숫자만 추출
+  if (digits.startsWith("0")) {
+    return `+82${digits.substring(1)}`; // 0 제거하고 +82 추가
+  }
+  if (digits.startsWith("82")) {
+    return `+${digits}`; // 82로 시작하면 + 추가
+  }
+  return `+82${digits}`; // 나머지는 +82 추가
+};
 
-const otpKey = (phoneE164: string, context = "register") =>
-  `${OTP_PREFIX}:${context}:${normalizePhone(phoneE164)}`;
+const otpKey = (phoneE164: string, context = "register") => {
+  const normalized = normalizePhone(phoneE164);
+  const key = `${OTP_PREFIX}:${context}:${normalized}`;
+  console.log(`[OTP:KEY] 생성된 키: ${key} (원본: ${phoneE164})`);
+  return key;
+};
 
 const cdKey  = (phoneE164: string, context = "register") =>
   `${CD_PREFIX}:${context}:${normalizePhone(phoneE164)}`;

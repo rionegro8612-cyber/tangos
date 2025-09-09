@@ -12,9 +12,28 @@ services:
       - pgdata:/var/lib/postgresql/data
   
   redis:
-    image: redis:7
-    ports: ["6379:6379"]
-    command: ["redis-server","--appendonly","yes"]
+    image: redis:7.4-alpine
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1 --save 300 10 --save 60 10000
+      --protected-mode yes
+      --daemonize no
+    volumes:
+      - ./infra/redis/data:/data
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    # 외부 노출이 꼭 필요하지 않다면 ports 주석 처리 (내부 네트워크만)
+    # ports:
+    #   - "6379:6379"
+    networks:
+      - tango-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 5s
   
   server:
     build:
@@ -24,7 +43,10 @@ services:
       - ./apps/server/.env
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/tango
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://tango-redis:6379/0
+      - REDIS_PREFIX=""
+      - OTP_TTL_SEC="300"
+      - CLEANUP_ENABLED="false"
       - PHONE_ENC_KEY=${PHONE_ENC_KEY:-dev-32-bytes-minimum-secret-key}
       - NODE_ENV=development
       - KYC_MIN_AGE=50
@@ -33,12 +55,21 @@ services:
       - OTP_RATE_PER_IP=10
       - OTP_RATE_IP_WINDOW=3600
       - OTP_RESEND_COOLDOWN_SEC=60
-    depends_on: [db, redis]
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_started
     ports: ["4100:4100"]
     volumes:
       - ./apps/server:/app
       - /app/node_modules
     command: ["npm", "run", "dev"]
 
+networks:
+  tango-network:
+    driver: bridge
+
 volumes:
   pgdata:
+  redis_data:

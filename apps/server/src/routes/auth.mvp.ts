@@ -22,6 +22,26 @@ import {
   recordUserLogin,
 } from "../lib/metrics"; // 🆕 Added: 메트릭 함수들
 
+// ⬇️ 추가: Redis 클라이언트/도우미
+import { getRedis } from "../lib/redis";
+
+function normalizeE164(phone: string | undefined): string {
+  if (!phone) throw new Error("phone is required");
+  const p = phone.replace(/[^\d+]/g, "");
+  if (!p.startsWith("+")) throw new Error("phone must be E.164");
+  return p;
+}
+
+// ⬇️ 추가: 서비스 레이어가 실패해도 확실히 저장하는 하드세이브
+async function saveOtpHard(phoneE164: string, code: string, ctx = "register", ttlSec = Number(process.env.OTP_TTL_SEC ?? 300)) {
+  const r = getRedis();
+  const key = `otp:${ctx}:${phoneE164}`;
+  await r.setex(key, ttlSec, code);              // setex = set with expiration
+  const ttl = await r.ttl(key);
+  console.log(`[otp][HARD] saved key=${key} ttl=${ttl}s code=${process.env.DEBUG_OTP ? code : "***"}`);
+  return { key, ttl };
+}
+
 // 🆕 미들웨어 import 추가
 import { rateLimitSend, rateLimitVerify } from "../middlewares/rateLimit";
 import { withIdempotency } from "../middlewares/idempotency";
@@ -56,19 +76,20 @@ authRouter.post("/send-sms",
       carrier?: string;
       context?: string;
     };
+    const ctx = context?.trim() || "register";
     const ip =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket.remoteAddress ||
       "0.0.0.0";
 
-    if (!phone || !carrier || !context) {
+    if (!phone || !carrier) {
       // 🆕 메트릭: OTP 전송 실패 (잘못된 요청)
       recordOtpSend("fail", "SENS", carrier || "unknown");
 
       return res.status(400).json({
         success: false,
         code: "BAD_REQUEST",
-        message: "phone, carrier, context required",
+        message: "phone, carrier required",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
@@ -85,15 +106,16 @@ authRouter.post("/send-sms",
         requestId: (req as any).requestId ?? null,
       });
     }
+    const p = normalizeE164(phone);
 
     // 🚨 레이트리밋은 미들웨어에서 처리됨 (rateLimitSend)
     
     // 재전송 쿨다운 체크
-    console.log(`[auth.mvp] 쿨다운 체크 시작: ${phone}`);
-    const cd = await checkAndMarkCooldown(phone);
+    console.log(`[auth.mvp] 쿨다운 체크 시작: ${p}`);
+    const cd = await checkAndMarkCooldown(p);
     console.log(`[auth.mvp] 쿨다운 체크 결과:`, cd);
     if (cd.blocked) {
-      console.log(`[auth.mvp] 쿨다운에 걸림: ${phone}, retryAfter: ${cd.retryAfter}`);
+      console.log(`[auth.mvp] 쿨다운에 걸림: ${p}, retryAfter: ${cd.retryAfter}`);
       return res.status(429).json({
         success: false,
         code: "RESEND_BLOCKED",
@@ -102,12 +124,23 @@ authRouter.post("/send-sms",
         requestId: (req as any).requestId ?? null,
       });
     }
-    console.log(`[auth.mvp] 쿨다운 통과: ${phone}`);
+    console.log(`[auth.mvp] 쿨다운 통과: ${p}`);
 
     // OTP 코드 생성 및 저장
     const code = "" + Math.floor(100000 + Math.random() * 900000);
-    console.log(`[auth.mvp] issueOtp 호출 전: ${phone}, code: ${code}, context: ${context}`);
-    const issueResult = await issueOtp(phone, code, context);
+    console.log(`[auth.mvp] issueOtp 호출 전: ${p}, code: ${code}, context: ${ctx}`);
+    let issueResult: any;
+    let ok = false;
+    try {
+      issueResult = await issueOtp(p, code, ctx);
+      ok = true;
+    } catch (e) {
+      console.warn("[otp] issueOtp failed:", e);
+    }
+    // ⬇️ 서비스가 실패했을 때만 하드세이브 (feature flag)
+    if (!ok && process.env.OTP_HARD_SAVE === "1") {
+      issueResult = await saveOtpHard(p, code, ctx, Number(process.env.OTP_TTL_SEC ?? 300));
+    }
     console.log(`[auth.mvp] issueOtp 결과:`, issueResult);
 
     // 성공 시 레이트리밋 헤더 설정 (간단한 형태)
@@ -122,14 +155,14 @@ authRouter.post("/send-sms",
     const includeDevCode = isDev || String(req.query.dev ?? "").trim() === "1";
 
     const data: any = {
-      phoneE164: phone,
+      phoneE164: p,
       expiresInSec: TTL,
       cooldown: 60, // 재전송 쿨다운 (1분)
       ...(includeDevCode ? { devCode: code } : {}),
     };
 
     if (includeDevCode) {
-      console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s)`);
+      console.log(`[DEV][OTP] ${p} -> ${code} (ttl=${TTL}s)`);
     }
 
     // 🆕 메트릭: OTP 전송 성공
@@ -183,14 +216,16 @@ authRouter.post("/resend-sms",
       return res.status(400).json({
         success: false,
         code: "BAD_REQUEST",
-        message: "phone, carrier, context required",
+        message: "phone, carrier required",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
     }
 
+    const p = normalizeE164(phone);
+
     // 재전송 쿨다운 체크
-    const cd = await checkAndMarkCooldown(phone);
+    const cd = await checkAndMarkCooldown(p);
     if (cd.blocked) {
       return res.status(429).json({
         success: false,
@@ -202,7 +237,7 @@ authRouter.post("/resend-sms",
     }
 
     // 쿨다운 체크 및 설정
-    const cooldownPassed = await checkAndMarkCooldown(phone, "register", 60);
+    const cooldownPassed = await checkAndMarkCooldown(p, "register", 60);
     if (!cooldownPassed) {
       return res.status(429).json({
         success: false,
@@ -215,21 +250,31 @@ authRouter.post("/resend-sms",
 
     // OTP 코드 생성 및 저장
     const code = "" + Math.floor(100000 + Math.random() * 900000);
-    await issueOtp(phone, code, "register");
+    let ok = false;
+    try { 
+      await issueOtp(p, code, "register"); 
+      ok = true;
+    } catch (e) {
+      console.warn("[otp] issueOtp failed:", e);
+    }
+    // ⬇️ 서비스가 실패했을 때만 하드세이브 (feature flag)
+    if (!ok && process.env.OTP_HARD_SAVE === "1") {
+      await saveOtpHard(p, code, "register", Number(process.env.OTP_TTL_SEC ?? 300));
+    }
 
     // 개발 환경에서만 코드 표시
     const isDev = process.env.NODE_ENV !== "production";
     const includeDevCode = isDev || String(req.query.dev ?? "").trim() === "1";
 
     const data: any = {
-      phoneE164: phone,
+      phoneE164: p,
       expiresInSec: TTL,
       retryAfter: 60, // 재전송 쿨다운 (1분)
       ...(includeDevCode ? { devCode: code } : {}),
     };
 
     if (includeDevCode) {
-      console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s) - RESEND`);
+      console.log(`[DEV][OTP] ${p} -> ${code} (ttl=${TTL}s) - RESEND`);
     }
 
     // 🆕 메트릭: OTP 재전송 성공
@@ -253,19 +298,21 @@ authRouter.post("/verify-code",
       code?: string;
       context?: string;
     };
+    const ctx = context?.trim() || "register";
+    const p = normalizeE164(phone);
     const ip =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket.remoteAddress ||
       "0.0.0.0";
 
-    if (!phone || !code || !context) {
+    if (!phone || !code) {
       // 🆕 메트릭: OTP 검증 실패 (잘못된 요청)
       recordOtpVerify("fail", "BAD_REQUEST");
 
       return res.status(400).json({
         success: false,
         code: "BAD_REQUEST",
-        message: "phone, code, context required",
+        message: "phone, code required",
         data: null,
         requestId: (req as any).requestId ?? null,
       });
@@ -274,8 +321,23 @@ authRouter.post("/verify-code",
     // OTP 검증 (강화된 예외 처리)
     let otpData;
     try {
-      otpData = await fetchOtp(phone, context);
-      console.log(`[DEBUG] OTP 검증: ${phone}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
+      otpData = await fetchOtp(p, ctx);
+      console.log(`[DEBUG] OTP 검증: ${p}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
+      let usedCtx = ctx;
+      
+      if (!otpData?.exists) {
+        // 백오프: 혹시 저장 측 컨텍스트가 다른 값이었으면 한 번 더 조회
+        const fallbacks = ctx === "register" ? ["login"] : ["register"];
+        for (const fb of fallbacks) {
+          const probe = await fetchOtp(p, fb);
+          if (probe?.exists) {
+            otpData = probe;
+            usedCtx = fb;
+            console.log(`[DEBUG] 백오프 조회 성공: ${p}, fallback context: ${fb}`);
+            break;
+          }
+        }
+      }
       
       if (!otpData?.exists) {
         // 🆕 메트릭: OTP 검증 실패 (코드 만료)
@@ -315,9 +377,18 @@ authRouter.post("/verify-code",
           requestId: (req as any).requestId ?? null,
         });
       }
+
+      // ✅ 여기까지 오면 유효코드: 사용한 컨텍스트로 정확히 삭제
+      try {
+        const r = getRedis();
+        await r.del(`otp:${usedCtx}:${p}`);
+      } catch (delErr) {
+        console.warn("[otp] delete failed (fallback to service):", delErr);
+        try { await delOtp(p, usedCtx as any); } catch {}
+      }
       
     } catch (otpError) {
-      console.error(`[auth] OTP fetch error for ${phone}:`, otpError);
+      console.error(`[auth] OTP fetch error for ${p}:`, otpError);
       return res.status(500).json({
         success: false,
         code: "INTERNAL_ERROR",
@@ -327,20 +398,19 @@ authRouter.post("/verify-code",
       });
     }
 
-    // OTP 사용 후 삭제
-    await delOtp(phone, context);
+    // ⛔️ 위에서 이미 정확한 컨텍스트로 삭제 완료
 
     // 사용자 존재 여부 확인 (isNew 필드 결정)
-    const existingUser = await findByPhone(phone);
+    const existingUser = await findByPhone(p);
     const isNew = !existingUser; // 사용자가 없으면 신규 사용자
 
     // 가입 티켓 발급 (신규 사용자인 경우)
     if (isNew) {
-      console.log(`[DEBUG] 신규 사용자 확인됨: ${phone}, 가입 티켓 생성 시작`);
+      console.log(`[DEBUG] 신규 사용자 확인됨: ${p}, 가입 티켓 생성 시작`);
       
-      const ticketKey = `reg:ticket:${phone}`;
+      const ticketKey = `reg:ticket:${p}`;
       const ticketData = {
-        phone,
+        phone: p,
         verifiedAt: new Date().toISOString(),
         attempts: 1,
       };
@@ -380,11 +450,11 @@ authRouter.post("/verify-code",
         }
       }
     } else {
-      console.log(`[DEBUG] 기존 사용자: ${phone}, 로그인 처리 시작`);
+      console.log(`[DEBUG] 기존 사용자: ${p}, 로그인 처리 시작`);
       
       // 기존 사용자 로그인 처리: 토큰 발급 및 쿠키 설정
       try {
-        const user = await findByPhone(phone);
+        const user = await findByPhone(p);
         if (user) {
           const jti = newJti();
           const at = signAccessToken(user.id, jti);
@@ -393,10 +463,10 @@ authRouter.post("/verify-code",
           // 로그인 성공 시 쿠키 설정
           setAuthCookies(res, at, rt);
           
-          console.log(`[DEBUG] 로그인 성공: ${phone}, 토큰 발급 완료`);
+          console.log(`[DEBUG] 로그인 성공: ${p}, 토큰 발급 완료`);
         }
       } catch (error) {
-        console.error(`[ERROR] 로그인 처리 실패: ${phone}`, error);
+        console.error(`[ERROR] 로그인 처리 실패: ${p}`, error);
         // 로그인 실패 시에도 OTP 검증은 성공으로 처리
       }
     }
@@ -411,7 +481,7 @@ authRouter.post("/verify-code",
       "OTP_VERIFIED",
       200,
       req.requestId,
-      phoneMasked(phone),
+      phoneMasked(p),
       ip,
       undefined,
       latencyMs,
@@ -501,7 +571,7 @@ authRouter.post("/signup",
       return res.status(400).json({
         success: false,
         code: "BAD_REQUEST",
-        message: "phone, code, context required",
+        message: "phone, code required",
         data: null,
         requestId: (req as any).requestId ?? null,
       });

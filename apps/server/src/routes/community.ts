@@ -5,6 +5,8 @@ import { Router } from 'express';
 
 const router = Router();
 
+console.log("🔧 Community router loaded successfully!");
+
 // 테스트용 간단한 라우터 (라우터 로드 확인용)
 router.get('/test', (req, res) => {
   res.json({ message: 'Community router loaded successfully!' });
