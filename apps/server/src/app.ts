@@ -5,7 +5,6 @@ import helmet from "helmet";
 import cors, { CorsOptionsDelegate } from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import { router } from "./routes";
 import requestId from "./middlewares/requestId";
 import { responseMiddleware, standardErrorHandler } from "./lib/response";
 import { setupCleanupScheduler } from "./lib/cleanup";
@@ -187,39 +186,30 @@ process.on("SIGINT", () => {
 
 // ▼ 개발 시 등록된 라우트 로그 (테스트 환경에서는 비활성화)
 if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
-  const logRoutes = () => {
-    console.log("\n[dev] Registered routes:");
-
-    // 간단한 방법: apiRouter의 라우트 정보 직접 출력
-    console.log("📋 API Router Info:");
-    console.log(`- Base path: ${API_BASE}`);
-    console.log(`- Router stack length: ${router.stack.length}`);
-
-    // 각 라우터별 정보 출력
-    router.stack.forEach((layer: any, index: number) => {
-      if (layer.name === "router") {
-        console.log(`- Router ${index + 1}: ${layer.regexp?.source || "unknown"}`);
-        if (layer.handle?.stack) {
-          console.log(`  └─ Sub-routes: ${layer.handle.stack.length}`);
+  const printRoutes = (app: any) => {
+    const walk = (stack: any, prefix = "") => {
+      stack.forEach((layer: any) => {
+        if (layer.route && layer.route.path) {
+          const methods = Object.keys(layer.route.methods)
+            .filter((m) => layer.route.methods[m])
+            .map((m) => m.toUpperCase())
+            .join(",");
+          console.log(`${methods.padEnd(7)} ${prefix}${layer.route.path}`);
+        } else if (layer.name === "router" && layer.handle?.stack) {
+          const path = layer.regexp?.fast_star ? "" :
+            (layer.regexp?.fast_slash ? "" : (layer.regexp?.toString() || ""));
+          // 경로 추출은 단순화 (prefix 기반으로만)
+          walk(layer.handle.stack, prefix);
         }
-      }
-    });
-
-    console.log("\n🔍 Manual route check:");
-    console.log("GET  /api/v1/_ping");
-    console.log("POST /api/v1/auth/send-sms");
-    console.log("POST /api/v1/auth/verify-login");
-    console.log("GET  /api/v1/auth/me");
-    console.log("POST /api/v1/auth/refresh");
-    console.log("POST /api/v1/auth/logout");
-    console.log("POST /api/v1/auth/register/start");
-    console.log("POST /api/v1/auth/register/verify");
-    console.log("POST /api/v1/auth/register/complete");
-    console.log("GET  /api/v1/profile/nickname/check");
-    console.log("POST /api/v1/profile/nickname");
-    console.log("POST /api/v1/profile/region");
+      });
+    };
+    console.log("\n[dev] Mounted routes (method path):");
+    // API_BASE와 apiRouter 조합으로 실제 mount 지점 출력
+    console.log(`(base) ${API_BASE}`);
+    // @ts-ignore
+    if (app._router?.stack) walk(app._router.stack);
   };
-  setTimeout(logRoutes, 200);
+  setTimeout(() => printRoutes(app), 300);
 }
 
 // 테스트를 위해 export

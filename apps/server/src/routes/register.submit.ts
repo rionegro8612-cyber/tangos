@@ -26,7 +26,7 @@ router.post("/submit", withIdempotency(), validate(SubmitSchema), async (req, re
       throw new AppError("PHONE_NOT_FOUND", 400, "Phone number is required");
     }
 
-    const ticketKey = `reg:ticket:${phone}`;
+    const ticketKey = `otp:ticket:${phone}`;
     let ticket;
     
     console.log(`[DEBUG] 회원가입 티켓 조회 시작: ${ticketKey}`);

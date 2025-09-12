@@ -9,6 +9,7 @@ import registerRouter from "./auth.register";
 import registerSubmitRouter from "./register.submit";
 import healthRouter from "./health";
 import communityRouter from "./community";
+import uploadRouter from "./upload";
 
 export const router = Router();
 
@@ -27,8 +28,11 @@ router.use("/auth/register", registerRouter);
 // 새로운 표준 회원가입 제출 API
 router.use("/auth/register", registerSubmitRouter);
 
-// Community (posts, feed 등) - 우선순위 높음
-router.use("/", communityRouter);
+// Community (posts, feed 등) - 명시적 prefix로 고정
+router.use("/community", communityRouter);
+
+// Upload (MinIO 파일 업로드)
+router.use("/upload", uploadRouter);
 
 // 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함)
 router.use("/", compatV1Router);

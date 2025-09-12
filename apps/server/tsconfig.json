@@ -15,5 +15,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*"],
-  "exclude": ["src/routes/_legacy/**", "node_modules", "dist"]
+  "exclude": ["src/routes/_legacy/**", "node_modules", "dist", "src/node_modules/**"]
 }

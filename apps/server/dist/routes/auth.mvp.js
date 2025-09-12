@@ -10,9 +10,44 @@ const jwt_2 = require("../lib/jwt");
 const otp_service_1 = require("../services/otp.service");
 const logger_1 = require("../lib/logger");
 const metrics_1 = require("../lib/metrics"); // 🆕 Added: 메트릭 함수들
+// ⬇️ 추가: Redis 클라이언트/도우미
+const redis_1 = require("../lib/redis");
+function normalizeE164(phone) {
+    if (!phone)
+        throw new Error("phone is required");
+    const p = phone.replace(/[^\d+]/g, "");
+    if (!p.startsWith("+"))
+        throw new Error("phone must be E.164");
+    return p;
+}
+// ⬇️ 추가: 서비스 레이어가 실패해도 확실히 저장하는 하드세이브
+async function saveOtpHard(phoneE164, code, ctx = "register", ttlSec = Number(process.env.OTP_TTL_SEC ?? 300)) {
+    const r = (0, redis_1.getRedis)();
+    const key = `otp:${ctx}:${phoneE164}`;
+    await r.setex(key, ttlSec, code); // setex = set with expiration
+    const ttl = await r.ttl(key);
+    console.log(`[otp][HARD] saved key=${key} ttl=${ttl}s code=${process.env.DEBUG_OTP ? code : "***"}`);
+    return { key, ttl };
+}
 const idempotency_1 = require("../middlewares/idempotency");
 // checkAndMarkCooldown은 이미 위에서 import됨
 const cookies_1 = require("../lib/cookies");
+// 🆕 개발 환경 OTP 코드 확인 함수
+async function getDevOtpCode(phoneE164) {
+    if (process.env.NODE_ENV === "production") {
+        return null; // 프로덕션에서는 보안상 비활성화
+    }
+    try {
+        const r = (0, redis_1.getRedis)();
+        const key = `otp:register:${phoneE164}`;
+        const code = await r.get(key);
+        return code;
+    }
+    catch (error) {
+        console.error("[DEV][OTP] Failed to get OTP code:", error);
+        return null;
+    }
+}
 // 🆕 환경변수 상수 추가
 const TTL = 300; // 5분
 const PHONE_LIMIT = 5;
@@ -33,16 +68,17 @@ async (req, res, next) => {
     try {
         const startTime = Date.now();
         const { phone, carrier, context } = (req.body || {});
+        const ctx = context?.trim() || "register";
         const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
             req.socket.remoteAddress ||
             "0.0.0.0";
-        if (!phone || !carrier || !context) {
+        if (!phone || !carrier) {
             // 🆕 메트릭: OTP 전송 실패 (잘못된 요청)
             (0, metrics_1.recordOtpSend)("fail", "SENS", carrier || "unknown");
             return res.status(400).json({
                 success: false,
                 code: "BAD_REQUEST",
-                message: "phone, carrier, context required",
+                message: "phone, carrier required",
                 data: null,
                 requestId: req.requestId ?? null,
             });
@@ -58,13 +94,14 @@ async (req, res, next) => {
                 requestId: req.requestId ?? null,
             });
         }
+        const p = normalizeE164(phone);
         // 🚨 레이트리밋은 미들웨어에서 처리됨 (rateLimitSend)
         // 재전송 쿨다운 체크
-        console.log(`[auth.mvp] 쿨다운 체크 시작: ${phone}`);
-        const cd = await (0, otp_service_1.checkAndMarkCooldown)(phone);
+        console.log(`[auth.mvp] 쿨다운 체크 시작: ${p}`);
+        const cd = await (0, otp_service_1.checkAndMarkCooldown)(p);
         console.log(`[auth.mvp] 쿨다운 체크 결과:`, cd);
         if (cd.blocked) {
-            console.log(`[auth.mvp] 쿨다운에 걸림: ${phone}, retryAfter: ${cd.retryAfter}`);
+            console.log(`[auth.mvp] 쿨다운에 걸림: ${p}, retryAfter: ${cd.retryAfter}`);
             return res.status(429).json({
                 success: false,
                 code: "RESEND_BLOCKED",
@@ -73,11 +110,23 @@ async (req, res, next) => {
                 requestId: req.requestId ?? null,
             });
         }
-        console.log(`[auth.mvp] 쿨다운 통과: ${phone}`);
+        console.log(`[auth.mvp] 쿨다운 통과: ${p}`);
         // OTP 코드 생성 및 저장
         const code = "" + Math.floor(100000 + Math.random() * 900000);
-        console.log(`[auth.mvp] issueOtp 호출 전: ${phone}, code: ${code}, context: register`);
-        const issueResult = await (0, otp_service_1.issueOtp)(phone, code, "register");
+        console.log(`[auth.mvp] issueOtp 호출 전: ${p}, code: ${code}, context: ${ctx}`);
+        let issueResult;
+        let ok = false;
+        try {
+            issueResult = await (0, otp_service_1.issueOtp)(p, code, ctx);
+            ok = true;
+        }
+        catch (e) {
+            console.warn("[otp] issueOtp failed:", e);
+        }
+        // ⬇️ 서비스가 실패했을 때만 하드세이브 (feature flag)
+        if (!ok && process.env.OTP_HARD_SAVE === "1") {
+            issueResult = await saveOtpHard(p, code, ctx, Number(process.env.OTP_TTL_SEC ?? 300));
+        }
         console.log(`[auth.mvp] issueOtp 결과:`, issueResult);
         // 성공 시 레이트리밋 헤더 설정 (간단한 형태)
         res.set({
@@ -89,13 +138,13 @@ async (req, res, next) => {
         const isDev = process.env.NODE_ENV !== "production";
         const includeDevCode = isDev || String(req.query.dev ?? "").trim() === "1";
         const data = {
-            phoneE164: phone,
+            phoneE164: p,
             expiresInSec: TTL,
             cooldown: 60, // 재전송 쿨다운 (1분)
             ...(includeDevCode ? { devCode: code } : {}),
         };
         if (includeDevCode) {
-            console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s)`);
+            console.log(`[DEV][OTP] ${p} -> ${code} (ttl=${TTL}s)`);
         }
         // 🆕 메트릭: OTP 전송 성공
         (0, metrics_1.recordOtpSend)("success", "SENS", carrier);
@@ -128,13 +177,14 @@ async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 code: "BAD_REQUEST",
-                message: "phone, carrier, context required",
+                message: "phone, carrier required",
                 data: null,
                 requestId: req.requestId ?? null,
             });
         }
+        const p = normalizeE164(phone);
         // 재전송 쿨다운 체크
-        const cd = await (0, otp_service_1.checkAndMarkCooldown)(phone);
+        const cd = await (0, otp_service_1.checkAndMarkCooldown)(p);
         if (cd.blocked) {
             return res.status(429).json({
                 success: false,
@@ -145,7 +195,7 @@ async (req, res, next) => {
             });
         }
         // 쿨다운 체크 및 설정
-        const cooldownPassed = await (0, otp_service_1.checkAndMarkCooldown)(phone, "register", 60);
+        const cooldownPassed = await (0, otp_service_1.checkAndMarkCooldown)(p, "register", 60);
         if (!cooldownPassed) {
             return res.status(429).json({
                 success: false,
@@ -157,18 +207,29 @@ async (req, res, next) => {
         }
         // OTP 코드 생성 및 저장
         const code = "" + Math.floor(100000 + Math.random() * 900000);
-        await (0, otp_service_1.issueOtp)(phone, code, "register");
+        let ok = false;
+        try {
+            await (0, otp_service_1.issueOtp)(p, code, "register");
+            ok = true;
+        }
+        catch (e) {
+            console.warn("[otp] issueOtp failed:", e);
+        }
+        // ⬇️ 서비스가 실패했을 때만 하드세이브 (feature flag)
+        if (!ok && process.env.OTP_HARD_SAVE === "1") {
+            await saveOtpHard(p, code, "register", Number(process.env.OTP_TTL_SEC ?? 300));
+        }
         // 개발 환경에서만 코드 표시
         const isDev = process.env.NODE_ENV !== "production";
         const includeDevCode = isDev || String(req.query.dev ?? "").trim() === "1";
         const data = {
-            phoneE164: phone,
+            phoneE164: p,
             expiresInSec: TTL,
             retryAfter: 60, // 재전송 쿨다운 (1분)
             ...(includeDevCode ? { devCode: code } : {}),
         };
         if (includeDevCode) {
-            console.log(`[DEV][OTP] ${phone} -> ${code} (ttl=${TTL}s) - RESEND`);
+            console.log(`[DEV][OTP] ${p} -> ${code} (ttl=${TTL}s) - RESEND`);
         }
         // 🆕 메트릭: OTP 재전송 성공
         (0, metrics_1.recordOtpSend)("success", "SENS", carrier);
@@ -185,16 +246,18 @@ async (req, res, next) => {
     try {
         const startTime = Date.now();
         const { phone, code, context } = (req.body || {});
+        const ctx = context?.trim() || "register";
+        const p = normalizeE164(phone);
         const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
             req.socket.remoteAddress ||
             "0.0.0.0";
-        if (!phone || !code || !context) {
+        if (!phone || !code) {
             // 🆕 메트릭: OTP 검증 실패 (잘못된 요청)
             (0, metrics_1.recordOtpVerify)("fail", "BAD_REQUEST");
             return res.status(400).json({
                 success: false,
                 code: "BAD_REQUEST",
-                message: "phone, code, context required",
+                message: "phone, code required",
                 data: null,
                 requestId: req.requestId ?? null,
             });
@@ -202,8 +265,22 @@ async (req, res, next) => {
         // OTP 검증 (강화된 예외 처리)
         let otpData;
         try {
-            otpData = await (0, otp_service_1.fetchOtp)(phone);
-            console.log(`[DEBUG] OTP 검증: ${phone}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
+            otpData = await (0, otp_service_1.fetchOtp)(p, ctx);
+            console.log(`[DEBUG] OTP 검증: ${p}, exists: ${otpData?.exists}, expired: ${otpData?.expired}, ttl: ${otpData?.ttl}`);
+            let usedCtx = ctx;
+            if (!otpData?.exists) {
+                // 백오프: 혹시 저장 측 컨텍스트가 다른 값이었으면 한 번 더 조회
+                const fallbacks = ctx === "register" ? ["login"] : ["register"];
+                for (const fb of fallbacks) {
+                    const probe = await (0, otp_service_1.fetchOtp)(p, fb);
+                    if (probe?.exists) {
+                        otpData = probe;
+                        usedCtx = fb;
+                        console.log(`[DEBUG] 백오프 조회 성공: ${p}, fallback context: ${fb}`);
+                        break;
+                    }
+                }
+            }
             if (!otpData?.exists) {
                 // 🆕 메트릭: OTP 검증 실패 (코드 만료)
                 (0, metrics_1.recordOtpVerify)("fail", "EXPIRED");
@@ -237,9 +314,21 @@ async (req, res, next) => {
                     requestId: req.requestId ?? null,
                 });
             }
+            // ✅ 여기까지 오면 유효코드: 사용한 컨텍스트로 정확히 삭제
+            try {
+                const r = (0, redis_1.getRedis)();
+                await r.del(`otp:${usedCtx}:${p}`);
+            }
+            catch (delErr) {
+                console.warn("[otp] delete failed (fallback to service):", delErr);
+                try {
+                    await (0, otp_service_1.delOtp)(p, usedCtx);
+                }
+                catch { }
+            }
         }
         catch (otpError) {
-            console.error(`[auth] OTP fetch error for ${phone}:`, otpError);
+            console.error(`[auth] OTP fetch error for ${p}:`, otpError);
             return res.status(500).json({
                 success: false,
                 code: "INTERNAL_ERROR",
@@ -248,17 +337,16 @@ async (req, res, next) => {
                 requestId: req.requestId ?? null,
             });
         }
-        // OTP 사용 후 삭제
-        await (0, otp_service_1.delOtp)(phone);
+        // ⛔️ 위에서 이미 정확한 컨텍스트로 삭제 완료
         // 사용자 존재 여부 확인 (isNew 필드 결정)
-        const existingUser = await (0, userRepo_1.findByPhone)(phone);
+        const existingUser = await (0, userRepo_1.findByPhone)(p);
         const isNew = !existingUser; // 사용자가 없으면 신규 사용자
         // 가입 티켓 발급 (신규 사용자인 경우)
         if (isNew) {
-            console.log(`[DEBUG] 신규 사용자 확인됨: ${phone}, 가입 티켓 생성 시작`);
-            const ticketKey = `reg:ticket:${phone}`;
+            console.log(`[DEBUG] 신규 사용자 확인됨: ${p}, 가입 티켓 생성 시작`);
+            const ticketKey = `reg:ticket:${p}`;
             const ticketData = {
-                phone,
+                phone: p,
                 verifiedAt: new Date().toISOString(),
                 attempts: 1,
             };
@@ -298,21 +386,21 @@ async (req, res, next) => {
             }
         }
         else {
-            console.log(`[DEBUG] 기존 사용자: ${phone}, 로그인 처리 시작`);
+            console.log(`[DEBUG] 기존 사용자: ${p}, 로그인 처리 시작`);
             // 기존 사용자 로그인 처리: 토큰 발급 및 쿠키 설정
             try {
-                const user = await (0, userRepo_1.findByPhone)(phone);
+                const user = await (0, userRepo_1.findByPhone)(p);
                 if (user) {
                     const jti = (0, jwt_1.newJti)();
                     const at = (0, jwt_1.signAccessToken)(user.id, jti);
                     const rt = (0, jwt_1.signRefreshToken)(user.id, jti);
                     // 로그인 성공 시 쿠키 설정
                     (0, cookies_1.setAuthCookies)(res, at, rt);
-                    console.log(`[DEBUG] 로그인 성공: ${phone}, 토큰 발급 완료`);
+                    console.log(`[DEBUG] 로그인 성공: ${p}, 토큰 발급 완료`);
                 }
             }
             catch (error) {
-                console.error(`[ERROR] 로그인 처리 실패: ${phone}`, error);
+                console.error(`[ERROR] 로그인 처리 실패: ${p}`, error);
                 // 로그인 실패 시에도 OTP 검증은 성공으로 처리
             }
         }
@@ -320,7 +408,7 @@ async (req, res, next) => {
         (0, metrics_1.recordOtpVerify)("success", "VALID_CODE");
         // 성공 로깅
         const latencyMs = Date.now() - startTime;
-        (0, logger_1.logOtpVerify)("success", "OTP_VERIFIED", 200, req.requestId, phoneMasked(phone), ip, undefined, latencyMs);
+        (0, logger_1.logOtpVerify)("success", "OTP_VERIFIED", 200, req.requestId, phoneMasked(p), ip, undefined, latencyMs);
         // 응답 메시지 결정
         const message = isNew ? "SIGNUP_REQUIRED" : "LOGIN_OK";
         return res.ok({
@@ -389,7 +477,7 @@ async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 code: "BAD_REQUEST",
-                message: "phone, code, context required",
+                message: "phone, code required",
                 data: null,
                 requestId: req.requestId ?? null,
             });
@@ -495,6 +583,50 @@ exports.authRouter.get("/me", async (req, res, next) => {
         const { uid } = (0, jwt_2.verifyAccessTokenOrThrow)(token); // ✅ 같은 시크릿/같은 파서
         const user = await (0, userRepo_1.getUserProfile)(uid);
         return res.ok({ user }, "ME_OK", "ME_OK");
+    }
+    catch (e) {
+        next(e);
+    }
+});
+// 🆕 개발 환경 OTP 코드 확인 엔드포인트
+exports.authRouter.get("/dev-code", async (req, res, next) => {
+    try {
+        // 프로덕션 환경에서는 비활성화
+        if (process.env.NODE_ENV === "production") {
+            return res.status(404).json({
+                success: false,
+                code: "NOT_FOUND",
+                message: "Endpoint not available in production",
+                data: null,
+                requestId: req.requestId ?? null,
+            });
+        }
+        const { phone } = req.query;
+        if (!phone || typeof phone !== "string") {
+            return res.status(400).json({
+                success: false,
+                code: "BAD_REQUEST",
+                message: "phone query parameter is required",
+                data: null,
+                requestId: req.requestId ?? null,
+            });
+        }
+        const phoneE164 = normalizeE164(phone);
+        const code = await getDevOtpCode(phoneE164);
+        if (!code) {
+            return res.status(404).json({
+                success: false,
+                code: "NOT_FOUND",
+                message: "No active OTP code found for this phone number",
+                data: null,
+                requestId: req.requestId ?? null,
+            });
+        }
+        return res.ok({
+            phone: phoneE164,
+            code,
+            environment: "development"
+        }, "DEV_CODE_OK", "Development OTP code retrieved");
     }
     catch (e) {
         next(e);

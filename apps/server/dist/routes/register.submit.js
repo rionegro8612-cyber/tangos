@@ -24,7 +24,7 @@ router.post("/submit", (0, idempotency_1.withIdempotency)(), (0, validate_1.vali
         if (!phone) {
             throw new AppError_1.AppError("PHONE_NOT_FOUND", 400, "Phone number is required");
         }
-        const ticketKey = `reg:ticket:${phone}`;
+        const ticketKey = `otp:ticket:${phone}`;
         let ticket;
         console.log(`[DEBUG] 회원가입 티켓 조회 시작: ${ticketKey}`);
         console.log(`[DEBUG] 현재 전화번호: ${phone}`);

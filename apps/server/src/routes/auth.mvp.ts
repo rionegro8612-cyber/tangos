@@ -48,6 +48,23 @@ import { withIdempotency } from "../middlewares/idempotency";
 // checkAndMarkCooldown은 이미 위에서 import됨
 import { setAuthCookies, accessCookieOptions } from "../lib/cookies";
 
+// 🆕 개발 환경 OTP 코드 확인 함수
+async function getDevOtpCode(phoneE164: string): Promise<string | null> {
+  if (process.env.NODE_ENV === "production") {
+    return null; // 프로덕션에서는 보안상 비활성화
+  }
+  
+  try {
+    const r = getRedis();
+    const key = `otp:register:${phoneE164}`;
+    const code = await r.get(key);
+    return code;
+  } catch (error) {
+    console.error("[DEV][OTP] Failed to get OTP code:", error);
+    return null;
+  }
+}
+
 // 🆕 환경변수 상수 추가
 const TTL = 300; // 5분
 const PHONE_LIMIT = 5;
@@ -692,6 +709,54 @@ authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) =>
     const { uid } = verifyAccessTokenOrThrow(token); // ✅ 같은 시크릿/같은 파서
     const user = await getUserProfile(uid);
     return res.ok({ user }, "ME_OK", "ME_OK");
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 🆕 개발 환경 OTP 코드 확인 엔드포인트
+authRouter.get("/dev-code", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // 프로덕션 환경에서는 비활성화
+    if (process.env.NODE_ENV === "production") {
+      return res.status(404).json({
+        success: false,
+        code: "NOT_FOUND",
+        message: "Endpoint not available in production",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    const { phone } = req.query;
+    if (!phone || typeof phone !== "string") {
+      return res.status(400).json({
+        success: false,
+        code: "BAD_REQUEST",
+        message: "phone query parameter is required",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    const phoneE164 = normalizeE164(phone);
+    const code = await getDevOtpCode(phoneE164);
+    
+    if (!code) {
+      return res.status(404).json({
+        success: false,
+        code: "NOT_FOUND",
+        message: "No active OTP code found for this phone number",
+        data: null,
+        requestId: (req as any).requestId ?? null,
+      });
+    }
+
+    return res.ok({ 
+      phone: phoneE164, 
+      code,
+      environment: "development" 
+    }, "DEV_CODE_OK", "Development OTP code retrieved");
   } catch (e) {
     next(e);
   }

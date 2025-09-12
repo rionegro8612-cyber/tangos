@@ -1,43 +1,57 @@
-// 커뮤니티 MVP 리포지토리 (임시 비활성화)
+// 커뮤니티 MVP 리포지토리
 // 2025-01-XX
 
-// import { query } from '../lib/db';
-// import {
-//   Post,
-//   PostImage,
-//   Comment,
-//   PostLike,
-//   CommentLike,
-//   Follow,
-//   Block,
-//   Report,
-//   Hashtag,
-//   PostHashtag,
-//   Upload,
-//   PostWithAuthor,
-//   CommentWithAuthor,
-//   CursorData,
-//   FeedQuery
-// } from '../types/community';
+import { query } from '../lib/db';
 
-// export class CommunityRepo {
-//   // === 게시글 관련 ===
+// 간단한 타입 정의
+interface Post {
+  id: string;
+  user_id: string;
+  content: string;
+  location_code?: string;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at?: Date;
+}
+
+interface PostWithAuthor extends Post {
+  author_nickname: string;
+  author_profile_image?: string;
+}
+
+interface Comment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at?: Date;
+}
+
+interface CommentWithAuthor extends Comment {
+  author_nickname: string;
+  author_profile_image?: string;
+}
+
+export class CommunityRepo {
+  // === 게시글 관련 ===
   
-//   async createPost(userId: string, content: string, locationCode?: string): Promise<string> {
-//     const result = await query(
-//       'INSERT INTO posts (user_id, content, location_code) VALUES ($1, $2, $3) RETURNING id',
-//       [userId, content, locationCode]
-//     );
-//     return result.rows[0].id;
-//   }
+  async createPost(userId: string, content: string, locationCode?: string): Promise<string> {
+    const result = await query(
+      'INSERT INTO posts (user_id, content, location_code) VALUES ($1, $2, $3) RETURNING id',
+      [userId, content, locationCode]
+    );
+    return result.rows[0].id;
+  }
 
-//   async getPostById(postId: string): Promise<Post | null> {
-//     const result = await query(
-//       'SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL',
-//       [postId]
-//     );
-//     return result.rows[0] || null;
-//   }
+  async getPostById(postId: string): Promise<Post | null> {
+    const result = await query(
+      'SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL',
+      [postId]
+    );
+    return result.rows[0] || null;
+  }
 
 //   async deletePost(postId: string, userId: string): Promise<boolean> {
 //     const result = await query(
@@ -57,51 +71,21 @@
 
 //   // === 피드 관련 ===
   
-//   async getFeed(userId: string, query: FeedQuery): Promise<{ posts: PostWithAuthor[], nextCursor?: string }> {
-//     const limit = Math.min(query.limit || 20, 50);
-//     let cursorCondition = '';
-//     let params: any[] = [userId, limit + 1];
-//     let paramIndex = 3;
+  async getFeed(limit = 20): Promise<PostWithAuthor[]> {
+    const sql = `
+      SELECT posts.*, 
+             users.nickname as author_nickname,
+             users.avatar_url as author_profile_image
+      FROM posts 
+      LEFT JOIN users ON posts.user_id = users.id
+      WHERE posts.deleted_at IS NULL 
+      ORDER BY posts.created_at DESC
+      LIMIT $1
+    `;
 
-//     if (query.cursor) {
-//       try {
-//         const cursorData: CursorData = JSON.parse(Buffer.from(query.cursor, 'base64').toString());
-//         cursorCondition = `AND (posts.created_at, posts.id) < ($${paramIndex}, $${paramIndex + 1})`;
-//         params.push(cursorData.timestamp, cursorData.id);
-//         paramIndex += 2;
-//       } catch (e) {
-//         // 잘못된 커서는 무시하고 최신부터 조회
-//       }
-//     }
-
-//     const sql = `
-//       SELECT DISTINCT posts.*, 
-//              users.nickname as author_nickname,
-//              users.avatar_url as author_avatar_url
-//       FROM posts 
-//       LEFT JOIN users ON posts.user_id = users.id
-//       LEFT JOIN follows ON posts.user_id = follows.followee_id
-//       WHERE posts.deleted_at IS NULL 
-//         AND (posts.user_id = $1 OR follows.follower_id = $1)
-//         ${cursorCondition}
-//       ORDER BY posts.created_at DESC, posts.id DESC
-//       LIMIT $2
-//     `;
-
-//     const result = await query(sql, params);
-//     const posts = result.rows.slice(0, limit);
-//     const hasMore = result.rows.length > limit;
-
-//     // 다음 커서 생성
-//     let nextCursor: string | undefined;
-//     if (hasMore && posts.length > 0) {
-//       const lastPost = posts[posts.length - 1];
-//       const cursorData: CursorData = {
-//         timestamp: lastPost.created_at.toISOString(),
-//         id: lastPost.id
-//       };
-//       nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
-//     }
+    const result = await query(sql, [limit]);
+    return result.rows;
+  }
 
 //     // PostWithAuthor 형태로 변환
 //     const postsWithAuthor: PostWithAuthor[] = await Promise.all(
@@ -483,7 +467,9 @@
 //   }
 // }
 
-// export const communityRepo = new CommunityRepo();
+}
+
+export const communityRepo = new CommunityRepo();
 
 
 

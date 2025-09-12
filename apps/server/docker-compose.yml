@@ -8,22 +8,27 @@ services:
     env_file:
       - ./.env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=4100
       - DATABASE_URL=postgres://tango:tango123@postgres:5432/tango
       - REDIS_URL=redis://redis:6379
       - PHONE_ENC_KEY=${PHONE_ENC_KEY:-dev-32-bytes-minimum-secret-key}
+      - TRUST_PROXY=1
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
     networks:
       - tango-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4100/api/v1/_ping || curl -fsS http://localhost:4100/api/v1/_ping || exit 1"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:4100/api/v1/health"]
       interval: 10s
       timeout: 3s
-      retries: 5
+      retries: 20
       start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: "1g" }
   # ===== 데이터베이스 =====
   postgres:
     image: postgres:15-alpine
@@ -41,10 +46,13 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tango -d tango"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 20
       start_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: "1g" }
 
   # ===== Redis =====
   redis:
@@ -186,13 +194,22 @@ services:
     networks:
       - tango-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: "512m" }
 
   # ===== MinIO Client (mc) =====
   mc:
     image: minio/mc:latest
     container_name: tango-mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     networks:
       - tango-network
     restart: unless-stopped
