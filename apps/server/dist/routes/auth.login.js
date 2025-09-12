@@ -150,8 +150,8 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
 exports.loginRouter.get("/me", authJwt_1.default, async (req, res) => {
     if (!req.user?.id)
         return res.fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
-    // id로 사용자 조회 (id는 number 타입)
-    const user = await (0, userRepo_1.getUserProfile)(req.user.id);
+    // id로 사용자 조회 (id는 string 타입으로 변환)
+    const user = await (0, userRepo_1.getUserProfile)(String(req.user.id));
     if (!user)
         return res.fail("USER_NOT_FOUND", "사용자를 찾을 수 없습니다.", 404);
     return res.ok({

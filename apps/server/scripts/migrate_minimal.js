@@ -1,20 +1,4 @@
-﻿// C:\projects\apps\server\scripts\migrate_minimal.js
-const path = require("path");
-const { Client } = require("pg");
-const dotenv = require("dotenv");
-
-// 1) 서버 로컬 .env 우선
-dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
-// 2) 루트 .env 보조
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: false });
-
-// 3) DATABASE_URL 비면 DB_*로 조합
-if (!process.env.DATABASE_URL) {
-  const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME } = process.env;
-  if (DB_HOST && DB_PORT && DB_NAME && DB_USER) {
-    process.env.DATABASE_URL = `postgres://${DB_USER}:${DB_PASSWORD || ""}@${DB_HOST}:${DB_PORT}/${DB_NAME}`;
-  }
-}
+﻿const { Client } = require("pg");
 
 const SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -37,11 +21,7 @@ CREATE TABLE IF NOT EXISTS auth_sms_codes (
   attempt_count INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- OTP 정책을 위한 복합 인덱스 (phone + expire_at)
-CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone_expire ON auth_sms_codes(phone_e164_norm, expire_at);
--- 요청 제한을 위한 인덱스
-CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone_created ON auth_sms_codes(phone_e164_norm, created_at);
+CREATE INDEX IF NOT EXISTS idx_auth_sms_codes_phone ON auth_sms_codes(phone_e164_norm);
 
 CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
   id BIGSERIAL PRIMARY KEY,

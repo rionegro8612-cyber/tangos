@@ -763,4 +763,4 @@ authRouter.get("/dev-code", async (req: Request, res: Response, next: NextFuncti
 });
 
 // 호환성 위해 default export도 제공
-export default authRouter;
+export default authRouter; 
