@@ -1,9 +1,9 @@
 // apps/server/src/routes/user.ts
 import { Router } from "express";
-import requireAuth from "../middlewares/requireAuth";
+import { authRequired } from "../middlewares/auth";
 const router = Router();
 
-router.get("/me", requireAuth, (req, res) => {
+router.get("/me", authRequired, (req, res) => {
   return res.json({
     success: true,
     code: "OK",

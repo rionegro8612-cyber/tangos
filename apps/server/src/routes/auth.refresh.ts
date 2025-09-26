@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { REFRESH_COOKIE, clearAuthCookies } from "../lib/cookies";
+import { REFRESH_COOKIE, clearAuthCookies, setAuthCookies } from "../lib/cookies";
+import { verifyRefreshToken, newJti, signAccessToken, signRefreshToken, sha256 } from "../lib/jwt";
+import { findByTokenHash, revokeAllForUser, revokeToken, saveNewRefreshToken } from "../repos/refreshTokenRepo";
 
 export const refreshRouter = Router();
 
@@ -7,37 +9,26 @@ refreshRouter.post("/refresh", async (req, res) => {
   const rt = req.cookies?.[REFRESH_COOKIE] as string | undefined;
   if (!rt) return res.fail("AUTH_NO_RT", "리프레시 토큰이 없습니다.", 401);
 
-  // 임시로 테이블이 없으므로 간단히 로그인 재요청 처리
-  console.log("[REFRESH] 리프레시 토큰 요청 - 테이블 없음으로 인한 재로그인 요청");
-  clearAuthCookies(res);
-  return res.fail("AUTH_RT_REUSE", "세션 재인증이 필요합니다.", 401);
-
-  // TODO: refresh_tokens 테이블 생성 후 다음 코드 활성화
-  /*
-  import { verifyRefreshToken, newJti, signAccessToken, signRefreshToken, sha256 } from "../lib/jwt";
-  import { findByJti, revokeAllForUser, revokeJti, saveNewRefreshToken } from "../repos/refreshTokenRepo";
-  import { setAuthCookies } from "../lib/cookies";
-
   try {
     const payload = verifyRefreshToken(rt); // { uid, jti }
-    const record = await findByJti(payload.jti);
+    const tokenHash = sha256(rt);
+    const record = await findByTokenHash(tokenHash);
 
-    if (!record || record.revoked) {
+    if (!record) {
       await revokeAllForUser(String(payload.uid));
       clearAuthCookies(res);
       return res.fail("AUTH_RT_REUSE", "세션 재인증이 필요합니다.", 401);
     }
-    if (record.token_hash !== sha256(rt)) {
-      await revokeAllForUser(String(payload.uid));
-      clearAuthCookies(res);
-      return res.fail("AUTH_RT_TAMPERED", "세션 재인증이 필요합니다.", 401);
-    }
 
+    // 토큰 회전: 새 토큰 발급
     const newId = newJti();
     const at = signAccessToken(String(payload.uid), newId);
     const newRt = signRefreshToken(String(payload.uid), newId);
 
-    await revokeJti(payload.jti, newId);
+    // 기존 토큰 폐기
+    await revokeToken(tokenHash);
+    
+    // 새 토큰 저장
     await saveNewRefreshToken({
       jti: newId,
       userId: String(payload.uid),
@@ -48,10 +39,10 @@ refreshRouter.post("/refresh", async (req, res) => {
     });
 
     setAuthCookies(res, at, newRt);
-    return res.ok({ refreshed: true }, "OK");
-  } catch {
+    return res.ok({ refreshed: true }, "토큰이 갱신되었습니다.");
+  } catch (error) {
+    console.error("[REFRESH] 토큰 검증 실패:", error);
     clearAuthCookies(res);
     return res.fail("AUTH_RT_INVALID", "유효하지 않은 리프레시 토큰입니다.", 401);
   }
-  */
 });

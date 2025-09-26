@@ -1,29 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { verifyAccessTokenOrThrow } from "../lib/jwt";
+import { getTokenFromReq } from "../lib/auth.shared";
 
-// 기존 getTokenFromReq 함수와 동일한 로직 (중복 방지)
-function getTokenFromReq(req: Request): string | undefined {
-  const hdr = req.headers.authorization || "";
-  const m = hdr.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] || (req.cookies?.access_token as string | undefined);
-}
-
-// 토큰 검증 및 사용자 정보 주입
-function verifyAccessTokenOrThrow(token: string): { userId: string | number } {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev-secret") as any;
-    
-    // UUID와 정수 모두 허용
-    const userId = decoded.userId || decoded.sub || decoded.id;
-    if (!userId) {
-      throw new Error("Invalid token: missing user ID");
-    }
-    
-    return { userId };
-  } catch (error) {
-    throw new Error("Invalid or expired token");
-  }
-}
+// lib/jwt.ts의 verifyAccessTokenOrThrow 함수를 사용 (중복 제거)
 
 // 인증 필수 미들웨어
 export function authRequired(req: Request, res: Response, next: NextFunction) {
@@ -35,14 +14,14 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
         code: "UNAUTHORIZED",
         message: "Authentication required",
         data: null,
-        requestId: (req as any).requestId ?? null,
+        requestId: (req as any).requestId ?? "",
       });
     }
 
-    const { userId } = verifyAccessTokenOrThrow(token);
+    const { uid } = verifyAccessTokenOrThrow(token); // lib/jwt.ts의 함수 사용
     
     // req.user 주입 (기존 코드와 호환: id 필드 사용)
-    (req as any).user = { id: userId };
+    (req as any).user = { id: uid };
     
     next();
   } catch (error) {
@@ -51,7 +30,7 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
       code: "UNAUTHORIZED", 
       message: error instanceof Error ? error.message : "Authentication failed",
       data: null,
-      requestId: (req as any).requestId ?? null,
+      requestId: (req as any).requestId ?? "",
     });
   }
 }
@@ -61,8 +40,8 @@ export function authOptional(req: Request, res: Response, next: NextFunction) {
   try {
     const token = getTokenFromReq(req);
     if (token) {
-      const { userId } = verifyAccessTokenOrThrow(token);
-      (req as any).user = { id: userId };
+      const { uid } = verifyAccessTokenOrThrow(token); // lib/jwt.ts의 함수 사용
+      (req as any).user = { id: uid };
     }
     // 토큰이 없어도 통과 (인증 선택적)
     next();

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { REFRESH_COOKIE, clearAuthCookies } from "../lib/cookies";
-import { verifyRefreshToken } from "../lib/jwt";
-import { revokeJti } from "../repos/refreshTokenRepo";
+import { verifyRefreshToken, sha256 } from "../lib/jwt";
+import { revokeToken } from "../repos/refreshTokenRepo";
 
 export const logoutRouter = Router();
 
@@ -10,7 +10,8 @@ logoutRouter.post("/logout", async (req, res) => {
   if (rt) {
     try {
       const payload = verifyRefreshToken(rt);
-      await revokeJti(payload.jti);
+      const tokenHash = sha256(rt);
+      await revokeToken(tokenHash);
     } catch {
       /* ignore */
     }

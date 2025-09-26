@@ -5,7 +5,6 @@ import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { communityRepo } from '../repos/communityRepo';
 import { authRequired, authOptional } from '../middlewares/auth';
-
 const router = Router();
 
 console.log("🔧 Community router loaded successfully!");

@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { newJti, signAccessToken, signRefreshToken } from "../lib/jwt";
 import { setAuthCookies } from "../lib/cookies";
-// // import { saveNewRefreshToken } from "../repos/refreshTokenRepo"; // 임시 비활성화 // 임시 비활성화
+import { saveNewRefreshToken } from "../repos/refreshTokenRepo";
 import { findByPhone, getUserProfile } from "../repos/userRepo";
 import { getOtp, delOtp, setOtp } from "../services/otp.service";
-import authJwt from "../middlewares/authJwt";
+import { authRequired } from "../middlewares/auth";
 import { normalizeE164 } from "../lib/phone";
 import { recordOtpSend, recordOtpVerify, recordUserLogin } from "../lib/metrics";
 
@@ -68,15 +68,21 @@ loginRouter.post("/verify-login", async (req, res) => {
   const jti = newJti();
   const at = signAccessToken(String(user.id), jti);
   const rt = signRefreshToken(String(user.id), jti);
-  // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-  console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
-  // TODO: refresh_tokens 테이블 생성 후 활성화
-  // await saveNewRefreshToken({
-  //   jti, userId: String(user.id), token: rt,
-  //   expiresAt: new Date(Date.now() + 30*24*60*60*1000),
-  //   userAgent: req.headers["user-agent"]?.toString() ?? undefined,
-  //   ip: req.ip ?? undefined,
-  // });
+  
+  console.log("[LOGIN_DEBUG] 토큰 생성 완료:", { jti, userId: String(user.id) });
+  
+  // 리프레시 토큰 저장
+  console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 시작");
+  await saveNewRefreshToken({
+    jti, 
+    userId: String(user.id), 
+    token: rt,
+    expiresAt: new Date(Date.now() + 30*24*60*60*1000),
+    userAgent: req.headers["user-agent"]?.toString() ?? undefined,
+    ip: req.ip ?? undefined,
+  });
+  console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 완료");
+  
   setAuthCookies(res, at, rt);
 
   // 🆕 메트릭: 사용자 로그인 성공
@@ -110,15 +116,21 @@ loginRouter.post("/verify-code", async (req, res) => {
   const jti = newJti();
   const at = signAccessToken(String(user.id), jti);
   const rt = signRefreshToken(String(user.id), jti);
-  // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-  console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
-  // TODO: refresh_tokens 테이블 생성 후 활성화
-  // await saveNewRefreshToken({
-  //   jti, userId: String(user.id), token: rt,
-  //   expiresAt: new Date(Date.now() + 30*24*60*60*1000),
-  //   userAgent: req.headers["user-agent"]?.toString() ?? undefined,
-  //   ip: req.ip ?? undefined,
-  // });
+  
+  console.log("[LOGIN_DEBUG] 토큰 생성 완료:", { jti, userId: String(user.id) });
+  
+  // 리프레시 토큰 저장
+  console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 시작");
+  await saveNewRefreshToken({
+    jti, 
+    userId: String(user.id), 
+    token: rt,
+    expiresAt: new Date(Date.now() + 30*24*60*60*1000),
+    userAgent: req.headers["user-agent"]?.toString() ?? undefined,
+    ip: req.ip ?? undefined,
+  });
+  console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 완료");
+  
   setAuthCookies(res, at, rt);
 
   // 🆕 메트릭: 사용자 로그인 성공
@@ -128,7 +140,7 @@ loginRouter.post("/verify-code", async (req, res) => {
 });
 
 // 세션 확인
-loginRouter.get("/me", authJwt, async (req, res) => {
+loginRouter.get("/me", authRequired, async (req, res) => {
   if (!req.user?.id) return res.fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
 
   // id로 사용자 조회 (id는 string 타입으로 변환)

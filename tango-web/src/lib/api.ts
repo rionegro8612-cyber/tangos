@@ -166,7 +166,10 @@ export async function apiFetch<T = unknown>(
 
 export async function sendSms(phone: string, opts?: { dev?: boolean }) {
   // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
-  const res = await fetch(`${API_BASE}/auth/send-sms`, {
+  const url = `${API_BASE}/auth/send-sms`;
+  console.log(`[DEBUG] sendSms URL: ${url}`);
+  console.log(`[DEBUG] API_BASE: ${API_BASE}`);
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',

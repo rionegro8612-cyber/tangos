@@ -10,6 +10,7 @@ import registerSubmitRouter from "./register.submit";
 import healthRouter from "./health";
 import communityRouter from "./community";
 import uploadRouter from "./upload";
+import profileRouter from "./profile";
 
 export const router = Router();
 
@@ -42,5 +43,8 @@ router.use("/auth", kycRouter);
 
 // User (프로필 등)
 router.use("/user", userRouter);
+
+// Profile (닉네임, 지역 등)
+router.use("/profile", profileRouter);
 
 export default router;
