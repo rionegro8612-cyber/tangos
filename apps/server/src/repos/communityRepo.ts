@@ -38,16 +38,28 @@ export class CommunityRepo {
   // === 게시글 관련 ===
   
   async createPost(userId: string, content: string, locationCode?: string): Promise<string> {
+    // userId를 bigint로 변환 (posts.user_id는 user_id_t 타입 = bigint)
+    const userIdBigint = parseInt(userId, 10);
+    
+    if (isNaN(userIdBigint)) {
+      throw new Error(`Invalid user ID: ${userId}`);
+    }
+    
     const result = await query(
-      'INSERT INTO posts (user_id, content, location_code) VALUES ($1, $2, $3) RETURNING id',
-      [userId, content, locationCode]
+      'INSERT INTO posts (user_id, content, location_code) VALUES ($1::bigint, $2, $3) RETURNING id',
+      [userIdBigint, content, locationCode]
     );
     return result.rows[0].id;
   }
 
-  async getPostById(postId: string): Promise<Post | null> {
+  async getPostById(postId: string): Promise<PostWithAuthor | null> {
     const result = await query(
-      'SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL',
+      `SELECT posts.*, 
+              users.nickname as author_nickname,
+              users.avatar_url as author_profile_image
+       FROM posts 
+       LEFT JOIN users ON posts.user_id = users.id
+       WHERE posts.id = $1 AND posts.deleted_at IS NULL`,
       [postId]
     );
     return result.rows[0] || null;
@@ -71,20 +83,44 @@ export class CommunityRepo {
 
 //   // === 피드 관련 ===
   
-  async getFeed(limit = 20): Promise<PostWithAuthor[]> {
-    const sql = `
+  async getFeed(limit = 20, cursor?: string): Promise<{ posts: PostWithAuthor[]; nextCursor?: string; hasMore: boolean }> {
+    let sql = `
       SELECT posts.*, 
              users.nickname as author_nickname,
              users.avatar_url as author_profile_image
       FROM posts 
       LEFT JOIN users ON posts.user_id = users.id
-      WHERE posts.deleted_at IS NULL 
-      ORDER BY posts.created_at DESC
-      LIMIT $1
+      WHERE posts.deleted_at IS NULL
     `;
+    
+    const params: any[] = [];
+    
+    // Cursor 기반 페이지네이션 (created_at 기준)
+    if (cursor) {
+      sql += ` AND posts.created_at < $1`;
+      params.push(cursor);
+    }
+    
+    sql += ` ORDER BY posts.created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit + 1); // hasMore 확인을 위해 +1
 
-    const result = await query(sql, [limit]);
-    return result.rows;
+    const result = await query(sql, params);
+    const posts = result.rows;
+    
+    // hasMore 확인
+    const hasMore = posts.length > limit;
+    if (hasMore) {
+      posts.pop(); // 마지막 항목 제거
+    }
+    
+    // nextCursor 생성 (마지막 post의 created_at)
+    const nextCursor = hasMore && posts.length > 0 ? posts[posts.length - 1].created_at.toISOString() : undefined;
+    
+    return {
+      posts,
+      nextCursor,
+      hasMore
+    };
   }
 
 //     // PostWithAuthor 형태로 변환

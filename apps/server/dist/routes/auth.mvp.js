@@ -7,6 +7,7 @@ const userRepo_1 = require("../repos/userRepo");
 const jwt_1 = require("../lib/jwt");
 const auth_shared_1 = require("../lib/auth.shared");
 const jwt_2 = require("../lib/jwt");
+const refreshTokenRepo_1 = require("../repos/refreshTokenRepo");
 const otp_service_1 = require("../services/otp.service");
 const logger_1 = require("../lib/logger");
 const metrics_1 = require("../lib/metrics"); // 🆕 Added: 메트릭 함수들
@@ -387,13 +388,29 @@ async (req, res, next) => {
         }
         else {
             console.log(`[DEBUG] 기존 사용자: ${p}, 로그인 처리 시작`);
+            console.log(`[FORCE_DEBUG] 강제 디버깅 메시지 - 코드가 실행되고 있습니다!`);
+            console.log(`[LOGIN_DEBUG] === 로그인 처리 시작 ===`);
             // 기존 사용자 로그인 처리: 토큰 발급 및 쿠키 설정
             try {
+                console.log(`[LOGIN_DEBUG] findByPhone 호출 전: ${p}`);
                 const user = await (0, userRepo_1.findByPhone)(p);
+                console.log(`[LOGIN_DEBUG] findByPhone 결과:`, user);
                 if (user) {
                     const jti = (0, jwt_1.newJti)();
                     const at = (0, jwt_1.signAccessToken)(user.id, jti);
                     const rt = (0, jwt_1.signRefreshToken)(user.id, jti);
+                    console.log("[LOGIN_DEBUG] 토큰 생성 완료:", { jti, userId: String(user.id) });
+                    // 리프레시 토큰 저장
+                    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 시작");
+                    await (0, refreshTokenRepo_1.saveNewRefreshToken)({
+                        jti,
+                        userId: String(user.id),
+                        token: rt,
+                        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                        userAgent: req.headers["user-agent"]?.toString() ?? undefined,
+                        ip: req.ip ?? undefined,
+                    });
+                    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 완료");
                     // 로그인 성공 시 쿠키 설정
                     (0, cookies_1.setAuthCookies)(res, at, rt);
                     console.log(`[DEBUG] 로그인 성공: ${p}, 토큰 발급 완료`);
@@ -634,3 +651,4 @@ exports.authRouter.get("/dev-code", async (req, res, next) => {
 });
 // 호환성 위해 default export도 제공
 exports.default = exports.authRouter;
+2;

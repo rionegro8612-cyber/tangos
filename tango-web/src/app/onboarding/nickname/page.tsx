@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 
 async function checkNickname(value: string, userId?: string){
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
   const url = userId 
-    ? `${base}/profile/nickname/check?value=${encodeURIComponent(value)}&userId=${encodeURIComponent(userId)}`
-    : `${base}/profile/nickname/check?value=${encodeURIComponent(value)}`;
+    ? `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}&userId=${encodeURIComponent(userId)}`
+    : `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}`;
   
   const res = await fetch(url, {
     credentials: "include"
@@ -50,8 +50,8 @@ export default function NicknamePage(){
     if (!canNext) return;
     
     try {
-      const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100/api/v1";
-      const res = await fetch(`${base}/profile/nickname`, {
+      const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
+      const res = await fetch(`${base}/api/v1/profile/nickname`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

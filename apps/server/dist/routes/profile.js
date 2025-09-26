@@ -8,6 +8,8 @@ const profileRouter = (0, express_1.Router)();
 profileRouter.get("/nickname/check", async (req, res) => {
     try {
         const { value, userId } = req.query;
+        // 🔍 디버깅 로그 추가
+        console.log(`[nickname/check] value: ${value}, userId: ${userId}, type: ${typeof userId}`);
         if (!value || typeof value !== "string") {
             return res.status(400).json({
                 success: false,
@@ -28,10 +30,12 @@ profileRouter.get("/nickname/check", async (req, res) => {
         let exists;
         if (userId && typeof userId === "string" && (0, uuid_1.validate)(userId)) {
             // userId가 제공된 경우: 자신 제외하고 중복 체크
+            console.log(`[nickname/check] 자신 제외 체크: ${nickname}, userId: ${userId}`);
             exists = await (0, db_1.query)(`SELECT 1 FROM users WHERE nickname = $1 AND id != $2::uuid LIMIT 1`, [nickname, userId]);
         }
         else {
-            // userId가 없는 경우: 기존 동작 유지 (모든 사용자에서 중복 체크)
+            // userId가 없는 경우: 신규 사용자로 간주하여 전체 중복 체크
+            console.log(`[nickname/check] 전체 중복 체크: ${nickname} (userId 없음)`);
             exists = await (0, db_1.query)(`SELECT 1 FROM users WHERE nickname = $1 LIMIT 1`, [nickname]);
         }
         const available = exists.rows.length === 0;

@@ -1,41 +1,53 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.saveNewRefreshToken = saveNewRefreshToken;
-exports.findByJti = findByJti;
-exports.revokeJti = revokeJti;
+exports.findByTokenHash = findByTokenHash;
+exports.revokeToken = revokeToken;
 exports.revokeAllForUser = revokeAllForUser;
+// apps/server/src/repos/refreshTokenRepo.ts
+const db_1 = require("../lib/db"); // 프로젝트 DB 클라이언트에 맞게 수정
+const jwt_1 = require("../lib/jwt");
 async function saveNewRefreshToken(args) {
-    // 임시로 테이블이 없으므로 로그만 출력
-    console.log("[REFRESH_TOKEN] 저장 시도:", { jti: args.jti, userId: args.userId });
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // const hash = sha256(args.token);
-    // await pool.query(
-    //   `INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at, revoked, user_agent, ip)
-    //    VALUES ($1, $2::uuid, $3, CURRENT_TIMESTAMP, $4, FALSE, $5, $6)`,
-    //   [args.jti, args.userId, hash, args.expiresAt, args.userAgent ?? null, args.ip ?? null]
-    // );
+    console.log("[REFRESH_TOKEN_DEBUG] 저장 시도:", {
+        jti: args.jti,
+        userId: args.userId,
+        tokenLength: args.token.length,
+        expiresAt: args.expiresAt,
+        userAgent: args.userAgent,
+        ip: args.ip
+    });
+    try {
+        const hash = (0, jwt_1.sha256)(args.token);
+        console.log("[REFRESH_TOKEN_DEBUG] 해시 생성:", hash);
+        const result = await db_1.pool.query(`INSERT INTO auth_refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_addr)
+       VALUES ($1::bigint, $2, $3, $4, $5)`, [args.userId, hash, args.expiresAt, args.userAgent ?? null, args.ip ?? null]);
+        console.log("[REFRESH_TOKEN_DEBUG] 저장 성공:", result.rowCount);
+    }
+    catch (error) {
+        console.error("[REFRESH_TOKEN_DEBUG] 저장 실패:", error);
+        throw error;
+    }
 }
-async function findByJti(jti) {
-    // 임시로 테이블이 없으므로 null 반환
-    console.log("[REFRESH_TOKEN] 조회 시도:", { jti });
-    return null;
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // const result = await pool.query(`SELECT * FROM refresh_tokens WHERE jti = $1`, [jti]);
-    // const row = result.rows[0];
-    // return row || null;
+async function findByTokenHash(tokenHash) {
+    console.log("[REFRESH_TOKEN_DEBUG] 조회 시도:", tokenHash);
+    try {
+        const result = await db_1.pool.query(`SELECT * FROM auth_refresh_tokens WHERE token_hash = $1 AND revoked_at IS NULL`, [tokenHash]);
+        console.log("[REFRESH_TOKEN_DEBUG] 조회 결과:", {
+            found: result.rows.length > 0,
+            count: result.rows.length,
+            data: result.rows[0] || null
+        });
+        const row = result.rows[0];
+        return row || null;
+    }
+    catch (error) {
+        console.error("[REFRESH_TOKEN_DEBUG] 조회 실패:", error);
+        throw error;
+    }
 }
-async function revokeJti(jti, replacedByJti) {
-    // 임시로 테이블이 없으므로 로그만 출력
-    console.log("[REFRESH_TOKEN] 폐기 시도:", { jti, replacedByJti });
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // await pool.query(
-    //   `UPDATE refresh_tokens SET revoked = TRUE, replaced_by_jti = $1 WHERE jti = $2`,
-    //   [replacedByJti ?? null, jti]
-    // );
+async function revokeToken(tokenHash) {
+    await db_1.pool.query(`UPDATE auth_refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1`, [tokenHash]);
 }
 async function revokeAllForUser(userId) {
-    // 임시로 테이블이 없으므로 로그만 출력
-    console.log("[REFRESH_TOKEN] 사용자 전체 폐기 시도:", { userId });
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // await pool.query(`UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1::uuid AND revoked = FALSE`, [userId]);
+    await db_1.pool.query(`UPDATE auth_refresh_tokens SET revoked_at = NOW() WHERE user_id = $1::uuid AND revoked_at IS NULL`, [userId]);
 }

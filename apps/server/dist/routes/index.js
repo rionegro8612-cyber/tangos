@@ -16,6 +16,7 @@ const register_submit_1 = __importDefault(require("./register.submit"));
 const health_1 = __importDefault(require("./health"));
 const community_1 = __importDefault(require("./community"));
 const upload_1 = __importDefault(require("./upload"));
+const profile_1 = __importDefault(require("./profile"));
 exports.router = (0, express_1.Router)();
 // 헬스체크 및 상태 모니터링
 exports.router.use("/", health_1.default);
@@ -37,4 +38,6 @@ exports.router.use("/", compat_v1_1.default);
 exports.router.use("/auth", kyc_mvp_1.default);
 // User (프로필 등)
 exports.router.use("/user", user_1.default);
+// Profile (닉네임, 지역 등)
+exports.router.use("/profile", profile_1.default);
 exports.default = exports.router;

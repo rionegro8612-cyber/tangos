@@ -11,7 +11,8 @@ exports.logoutRouter.post("/logout", async (req, res) => {
     if (rt) {
         try {
             const payload = (0, jwt_1.verifyRefreshToken)(rt);
-            await (0, refreshTokenRepo_1.revokeJti)(payload.jti);
+            const tokenHash = (0, jwt_1.sha256)(rt);
+            await (0, refreshTokenRepo_1.revokeToken)(tokenHash);
         }
         catch {
             /* ignore */

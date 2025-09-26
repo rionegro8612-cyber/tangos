@@ -255,7 +255,7 @@ export default function OtpForm({
         )}
 
         {/* 개발 모드에서 devCode 표시 */}
-        {sent?.devCode && process.env.NODE_ENV !== 'production' && (
+        {sent?.devCode && (
           <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-xs text-yellow-800">
               <strong>개발 모드:</strong> 인증번호 {sent.devCode}

@@ -19,10 +19,10 @@ const isProd = process.env.NODE_ENV === "production";
 /** (선택) 프로덕션 도메인 지정: 예) COOKIE_DOMAIN=.tango.app */
 function getCookieDomain() {
     const d = process.env.COOKIE_DOMAIN?.trim();
-    if (!d)
+    if (!d || !isProd)
         return undefined;
     // 안전: prod 에서만 domain 부여
-    return isProd ? d : undefined;
+    return d;
 }
 /** 공통 기본 옵션 */
 function baseCookieOptions(maxAgeMs) {
@@ -40,14 +40,21 @@ function baseCookieOptions(maxAgeMs) {
             domain: getCookieDomain(),
         };
     }
-    return {
+    const options = {
         httpOnly: true,
         secure,
         sameSite: sameSite,
         path: "/",
         maxAge: maxAgeMs,
-        domain: getCookieDomain(),
     };
+    // 도메인은 개발 환경에서 절대 설정하지 않음
+    if (isProd) {
+        const domain = getCookieDomain();
+        if (domain) {
+            options.domain = domain;
+        }
+    }
+    return options;
 }
 /** Access/Refresh 개별 옵션 */
 function accessCookieOptions() {

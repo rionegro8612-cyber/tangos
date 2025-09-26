@@ -35,9 +35,6 @@ router.use("/community", communityRouter);
 // Upload (MinIO 파일 업로드)
 router.use("/upload", uploadRouter);
 
-// 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함)
-router.use("/", compatV1Router);
-
 // KYC (PASS/NICE 등)
 router.use("/auth", kycRouter);
 
@@ -46,5 +43,8 @@ router.use("/user", userRouter);
 
 // Profile (닉네임, 지역 등)
 router.use("/profile", profileRouter);
+
+// 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함) - 마지막에 위치
+router.use("/", compatV1Router);
 
 export default router;

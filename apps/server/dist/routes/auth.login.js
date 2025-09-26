@@ -32,18 +32,15 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.loginRouter = void 0;
 const express_1 = require("express");
 const jwt_1 = require("../lib/jwt");
 const cookies_1 = require("../lib/cookies");
-// // import { saveNewRefreshToken } from "../repos/refreshTokenRepo"; // 임시 비활성화 // 임시 비활성화
+const refreshTokenRepo_1 = require("../repos/refreshTokenRepo");
 const userRepo_1 = require("../repos/userRepo");
 const otp_service_1 = require("../services/otp.service");
-const authJwt_1 = __importDefault(require("../middlewares/authJwt"));
+const auth_1 = require("../middlewares/auth");
 const phone_1 = require("../lib/phone");
 const metrics_1 = require("../lib/metrics");
 exports.loginRouter = (0, express_1.Router)();
@@ -96,15 +93,18 @@ exports.loginRouter.post("/verify-login", async (req, res) => {
     const jti = (0, jwt_1.newJti)();
     const at = (0, jwt_1.signAccessToken)(String(user.id), jti);
     const rt = (0, jwt_1.signRefreshToken)(String(user.id), jti);
-    // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-    console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // await saveNewRefreshToken({
-    //   jti, userId: String(user.id), token: rt,
-    //   expiresAt: new Date(Date.now() + 30*24*60*60*1000),
-    //   userAgent: req.headers["user-agent"]?.toString() ?? undefined,
-    //   ip: req.ip ?? undefined,
-    // });
+    console.log("[LOGIN_DEBUG] 토큰 생성 완료:", { jti, userId: String(user.id) });
+    // 리프레시 토큰 저장
+    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 시작");
+    await (0, refreshTokenRepo_1.saveNewRefreshToken)({
+        jti,
+        userId: String(user.id),
+        token: rt,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        userAgent: req.headers["user-agent"]?.toString() ?? undefined,
+        ip: req.ip ?? undefined,
+    });
+    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 완료");
     (0, cookies_1.setAuthCookies)(res, at, rt);
     // 🆕 메트릭: 사용자 로그인 성공
     (0, metrics_1.recordUserLogin)("success", "LOGIN_OK");
@@ -132,22 +132,25 @@ exports.loginRouter.post("/verify-code", async (req, res) => {
     const jti = (0, jwt_1.newJti)();
     const at = (0, jwt_1.signAccessToken)(String(user.id), jti);
     const rt = (0, jwt_1.signRefreshToken)(String(user.id), jti);
-    // 임시로 테이블이 없으므로 refresh 토큰 저장 스킵
-    console.log("[LOGIN] 리프레시 토큰 저장 스킵 (테이블 없음):", { jti, userId: String(user.id) });
-    // TODO: refresh_tokens 테이블 생성 후 활성화
-    // await saveNewRefreshToken({
-    //   jti, userId: String(user.id), token: rt,
-    //   expiresAt: new Date(Date.now() + 30*24*60*60*1000),
-    //   userAgent: req.headers["user-agent"]?.toString() ?? undefined,
-    //   ip: req.ip ?? undefined,
-    // });
+    console.log("[LOGIN_DEBUG] 토큰 생성 완료:", { jti, userId: String(user.id) });
+    // 리프레시 토큰 저장
+    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 시작");
+    await (0, refreshTokenRepo_1.saveNewRefreshToken)({
+        jti,
+        userId: String(user.id),
+        token: rt,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        userAgent: req.headers["user-agent"]?.toString() ?? undefined,
+        ip: req.ip ?? undefined,
+    });
+    console.log("[LOGIN_DEBUG] 리프레시 토큰 저장 완료");
     (0, cookies_1.setAuthCookies)(res, at, rt);
     // 🆕 메트릭: 사용자 로그인 성공
     (0, metrics_1.recordUserLogin)("success", "LOGIN_OK");
     return res.ok({ userId: String(user.id), autoLogin: true }, "LOGIN_OK");
 });
 // 세션 확인
-exports.loginRouter.get("/me", authJwt_1.default, async (req, res) => {
+exports.loginRouter.get("/me", auth_1.authRequired, async (req, res) => {
     if (!req.user?.id)
         return res.fail("UNAUTHORIZED", "로그인이 필요합니다.", 401);
     // id로 사용자 조회 (id는 string 타입으로 변환)
