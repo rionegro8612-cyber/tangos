@@ -4,16 +4,20 @@ import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 
 // 전화번호는 이미 +82 형식으로 저장되어 있음
+const OTP_TTL_SEC = 5 * 60;
+const OTP_META_KEY = "registerOtpMeta";
+const OTP_PHONE_KEY = "registerOtpPhone";
 
 export default function RegisterVerifyPage() {
   const router = useRouter();
   
   const [code, setCode] = useState("");
-  const [left, setLeft] = useState(5 * 60); // 05:00
+  const [left, setLeft] = useState(OTP_TTL_SEC); // 05:00
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(true);
+  const autoSendGuardRef = useRef(false);
   
   // 타이머 타입은 브라우저 기준 안전하게
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -21,6 +25,7 @@ export default function RegisterVerifyPage() {
   // SSR 회피용 상태
   const [phone, setPhone] = useState<string | null>(null);
   const [carrier, setCarrier] = useState<string | null>(null);
+  const [otpMeta, setOtpMeta] = useState<{ phone: string; sentAt: number } | null>(null);
 
   // 1) 브라우저에서만 sessionStorage 읽기
   useEffect(() => {
@@ -39,10 +44,53 @@ export default function RegisterVerifyPage() {
         router.replace("/register/carrier");
         return;
       }
+      const registeredPhone = window.sessionStorage.getItem(OTP_PHONE_KEY);
+      if (registeredPhone && registeredPhone !== p) {
+        window.sessionStorage.removeItem(OTP_META_KEY);
+      }
     } finally {
       setLoading(false);
     }
   }, [router]);
+
+  // 1-1) 기존 OTP 메타를 불러와 남은 시간 복원
+  useEffect(() => {
+    if (loading || !phone) return;
+    const raw = window.sessionStorage.getItem(OTP_META_KEY);
+    if (!raw) {
+      setOtpMeta(null);
+      setOtpSent(false);
+      setLeft(OTP_TTL_SEC);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { phone?: string; sentAt?: number };
+      if (!parsed?.phone || parsed.phone !== phone || typeof parsed.sentAt !== "number") {
+        window.sessionStorage.removeItem(OTP_META_KEY);
+        setOtpMeta(null);
+        setOtpSent(false);
+        setLeft(OTP_TTL_SEC);
+        return;
+      }
+      const elapsed = Math.floor((Date.now() - parsed.sentAt) / 1000);
+      if (elapsed >= OTP_TTL_SEC) {
+        window.sessionStorage.removeItem(OTP_META_KEY);
+        setOtpMeta(null);
+        setOtpSent(false);
+        setLeft(OTP_TTL_SEC);
+        return;
+      }
+      setOtpMeta({ phone: parsed.phone, sentAt: parsed.sentAt });
+      setOtpSent(true);
+      setLeft(Math.max(OTP_TTL_SEC - elapsed, 0));
+    } catch {
+      window.sessionStorage.removeItem(OTP_META_KEY);
+      setOtpMeta(null);
+      setOtpSent(false);
+      setLeft(OTP_TTL_SEC);
+    }
+  }, [loading, phone]);
 
   // 2) OTP 전송 함수 (상태/에러 로깅 강화)
   const sendOtp = useCallback(async () => {
@@ -83,7 +131,11 @@ export default function RegisterVerifyPage() {
       
       if (data.success) {
         setOtpSent(true);
-        setLeft(5 * 60); // 타이머 시작
+        setLeft(OTP_TTL_SEC); // 타이머 시작
+        const meta = { phone, sentAt: Date.now() };
+        window.sessionStorage.setItem(OTP_META_KEY, JSON.stringify(meta));
+        window.sessionStorage.setItem(OTP_PHONE_KEY, phone);
+        setOtpMeta(meta);
         if (data.data?.devCode) {
           window.sessionStorage.setItem("devCode", data.data.devCode);
         }
@@ -107,11 +159,18 @@ export default function RegisterVerifyPage() {
 
   // 3) 자동 발송(원하면 유지 / 아니라면 주석)
   useEffect(() => {
-    if (!loading && phone && carrier && !otpSent) {
+    if (!loading && phone && carrier && !otpSent && !autoSendGuardRef.current) {
+      autoSendGuardRef.current = true;
       console.log("[auto sendOtp]", { loading, phone, carrier, otpSent });
       void sendOtp();
     }
   }, [loading, phone, carrier, otpSent, sendOtp]);
+
+  useEffect(() => {
+    if (!otpSent) {
+      autoSendGuardRef.current = false;
+    }
+  }, [otpSent]);
 
   // 타이머 설정
   useEffect(() => {
@@ -182,26 +241,32 @@ export default function RegisterVerifyPage() {
        console.log("[verify-code response]", { status: response.status, data });
        
        if (data.success) {
-         console.log("[verify-code success]", data);
-         
-         // 🚨 기존 회원 vs 신규 회원 분기 처리
-         // 기존 회원인 경우: 로그인 완료 후 홈으로 이동
-         if (data.code === 'LOGIN_OK' || data.message === 'LOGIN_OK' || !data.data?.isNew) {
-           console.log("[verify-code] 기존 회원 로그인 완료:", data);
-           setMsg("로그인되었습니다.");
-           
-           // 기존 회원: 토큰이 있다면 저장하고 홈으로 이동
-           if (data.data?.accessToken) {
-             window.sessionStorage.setItem("accessToken", data.data.accessToken);
-           }
-           if (data.data?.refreshToken) {
-             window.sessionStorage.setItem("refreshToken", data.data.refreshToken);
-           }
-           
-           // 잠시 후 홈으로 이동
-           setTimeout(() => {
-             router.replace("/");
-           }, 2000);
+        console.log("[verify-code success]", data);
+
+        // 🚨 기존 회원 vs 신규 회원 분기 처리
+        const isExistingUser = !data.data?.isNew;
+        window.sessionStorage.removeItem(OTP_META_KEY);
+        if (isExistingUser) {
+          console.log("[verify-code] 기존 회원으로 감지:", data);
+          try {
+            await fetch(`${API_BASE}/auth/logout`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+            });
+          } catch (logoutError) {
+            console.warn("[verify-code] 기존 회원 로그아웃 중 오류(무시):", logoutError);
+          }
+          window.sessionStorage.removeItem("phoneVerified");
+          window.sessionStorage.removeItem("name");
+          window.sessionStorage.removeItem("birth");
+          window.sessionStorage.removeItem("gender");
+          window.sessionStorage.removeItem("terms");
+          window.sessionStorage.removeItem("nickname");
+          window.sessionStorage.removeItem("region");
+          window.sessionStorage.removeItem("devCode");
+          alert("이미 가입된 회원입니다. 로그인 화면으로 이동합니다.");
+          router.replace("/login");
            return;
          }
          
@@ -210,6 +275,7 @@ export default function RegisterVerifyPage() {
          
          // 전화번호 인증 완료 표시를 sessionStorage에 저장
          window.sessionStorage.setItem("phoneVerified", "true");
+        window.sessionStorage.removeItem(OTP_META_KEY);
          
          // 회원가입 정보도 sessionStorage에 저장 (닉네임/지역 설정 후 사용)
          window.sessionStorage.setItem("name", name);

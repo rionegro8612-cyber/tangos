@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendSms, verifyCode, me } from "@/lib/api";
-import { useAuthStore } from "@/store/auth";
+import { useAuthStore, normalizeUser } from "@/store/auth";
 
 function normalizeKrPhone(input: string): string {
   const d = (input || "").replace(/\D/g, "");
@@ -59,8 +59,14 @@ export default function LoginPage() {
     if (!raw) return alert("전화번호를 입력하세요.");
     setSending(true);
     try {
-      const res: any = await sendSms(raw, { dev: devMode });
-      setE164(pickPhoneE164(res, raw));
+      const normalized = normalizeKrPhone(raw);
+      if (!normalized) {
+        alert("전화번호 형식을 확인해주세요.");
+        setSending(false);
+        return;
+      }
+      const res: any = await sendSms(normalized, { dev: devMode, context: "login" });
+      setE164(pickPhoneE164(res, normalized));
       const dc = pickDevCode(res);
       setDevCode(dc ? String(dc) : undefined);
       setStep(2);
@@ -78,7 +84,12 @@ export default function LoginPage() {
     if (!raw || !c) return alert("전화번호와 인증번호를 입력하세요.");
     setVerifying(true);
     try {
-      const verifyResult = await verifyCode(raw, c);
+      const normalized = normalizeKrPhone(raw);
+      if (!normalized) {
+        alert("전화번호 형식을 확인해주세요.");
+        return;
+      }
+      const verifyResult = await verifyCode(normalized, c, { context: "login" });
       
       // 백엔드 응답 형식: { success: true, data: { verified: true }, message: "OTP_VERIFIED" }
       if (verifyResult?.success && verifyResult?.data?.verified) {
@@ -90,8 +101,9 @@ export default function LoginPage() {
         } catch { /* ignore */ }
 
         // 유저가 확실히 생겼을 때만 /profile로 이동
-        if (u) {
-          setUser(u);
+        const parsed = normalizeUser({ data: { user: u } });
+        if (parsed) {
+          setUser(parsed);
           router.replace("/profile");
         } else {
           alert("로그인 세션이 확인되지 않았습니다. 쿠키 설정을 확인해주세요.");

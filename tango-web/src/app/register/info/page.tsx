@@ -52,8 +52,8 @@ export default function RegisterInfoPage(){
   };
 
   // 인증번호 발송 및 verify 페이지로 이동
-  const onSendSms = async () => {
-    console.log("[onSendSms] start", { phone, carrier, API_BASE, terms });
+  const onProceedVerify = () => {
+    console.log("[onProceedVerify] proceed", { phone, carrier, API_BASE, terms });
 
     if (!terms.tos || !terms.privacy || !phone || !carrier) {
       setMsg("이용약관과 개인정보 처리방침에 동의해주세요.");
@@ -64,44 +64,16 @@ export default function RegisterInfoPage(){
     setMsg("");
 
     try {
-      // 인증번호 발송
-             const response = await fetch(`${API_BASE}/auth/send-sms`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone,
-          carrier,
-          context: "register"
-        })
-      });
+      // 모든 정보를 sessionStorage에 저장
+      window.sessionStorage.setItem("name", name);
+      window.sessionStorage.setItem("birth", birth);
+      window.sessionStorage.setItem("gender", gender);
+      window.sessionStorage.setItem("terms", JSON.stringify(terms));
+      window.sessionStorage.setItem("registerOtpPhone", phone);
+      window.sessionStorage.removeItem("registerOtpMeta");
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        const errorMsg = `HTTP ${response.status} ${response.statusText} :: ${text}`;
-        console.error("[send-sms failed]", errorMsg);
-        setMsg(errorMsg);
-        return;
-      }
-
-      const data = await response.json();
-      console.log("[send-sms OK]", data);
-      
-      if (data.success) {
-        // 모든 정보를 sessionStorage에 저장
-        window.sessionStorage.setItem("name", name);
-        window.sessionStorage.setItem("birth", birth);
-        window.sessionStorage.setItem("gender", gender);
-        window.sessionStorage.setItem("terms", JSON.stringify(terms));
-        
-        // verify 페이지로 이동
-        window.location.href = "/register/verify";
-      } else {
-        setMsg(data.message || "인증번호 전송에 실패했습니다.");
-      }
-    } catch (e: any) {
-      console.error("[send-sms exception]", e?.message || e);
-      setMsg("서버 오류가 발생했습니다.");
+      // verify 페이지로 이동
+      window.location.href = "/register/verify";
     } finally {
       setSending(false);
     }
@@ -256,10 +228,10 @@ export default function RegisterInfoPage(){
                 ? 'bg-blue-500 text-white hover:bg-blue-600' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
-            onClick={onSendSms}
+            onClick={onProceedVerify}
             disabled={!canGoNext() || sending}
           >
-            {sending ? "인증번호 전송 중..." : "다음"}
+            {sending ? "이동 중..." : "다음"}
           </button>
         )}
       </div>

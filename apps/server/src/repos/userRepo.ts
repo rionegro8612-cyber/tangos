@@ -29,6 +29,7 @@ export async function getUserProfile(userId: string) {
   const rows = await query<{
     id: string;
     phone: string;
+    region: string | null;
     nickname: string | null;
     isVerified: boolean;
     kycProvider: string | null;
@@ -42,6 +43,7 @@ export async function getUserProfile(userId: string) {
     SELECT
       id,
       phone_e164_norm        AS phone,
+      region                 AS region,
       nickname               AS nickname,
       is_verified            AS "isVerified",
       kyc_provider          AS "kycProvider",

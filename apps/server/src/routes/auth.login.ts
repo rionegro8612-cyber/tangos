@@ -49,7 +49,7 @@ loginRouter.post("/verify-login", async (req, res) => {
   if (!phone || !otp) return res.fail("VAL_400", "phone, otp 필수", 400);
 
   const e164 = normalizeE164(phone);
-  const storedCode = await getOtp(e164);
+  const { code: storedCode } = await getOtp(e164, "login");
   if (!storedCode || storedCode !== otp) {
     // 🆕 메트릭: OTP 검증 실패
     recordOtpVerify("fail", "INVALID_CODE");
@@ -60,7 +60,7 @@ loginRouter.post("/verify-login", async (req, res) => {
   recordOtpVerify("success", "VALID_CODE");
 
   // OTP 코드 삭제
-  await delOtp(e164);
+  await delOtp(e164, "login");
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);
@@ -97,7 +97,7 @@ loginRouter.post("/verify-code", async (req, res) => {
   if (!phone || !code) return res.fail("VAL_400", "phone, code 필수", 400);
 
   const e164 = normalizeE164(phone);
-  const storedCode = await getOtp(e164);
+  const { code: storedCode } = await getOtp(e164, "login");
   if (!storedCode || storedCode !== code) {
     // 🆕 메트릭: OTP 검증 실패
     recordOtpVerify("fail", "INVALID_CODE");
@@ -108,7 +108,7 @@ loginRouter.post("/verify-code", async (req, res) => {
   recordOtpVerify("success", "VALID_CODE");
 
   // OTP 코드 삭제
-  await delOtp(e164);
+  await delOtp(e164, "login");
 
   const user = await findByPhone(e164);
   if (!user) return res.fail("USER_NOT_FOUND", "가입된 사용자가 없습니다.", 404);

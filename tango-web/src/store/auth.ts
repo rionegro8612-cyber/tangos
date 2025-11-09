@@ -4,17 +4,18 @@ import { create } from 'zustand';
 import { sendSms as apiSendSms, verifyCode as apiVerifyCode, me as apiMe, logout as apiLogout, API_BASE } from '@/lib/api';
 
 export type User = {
-  id: number;
+  id: string;
   phone: string;
   nickname: string | null;
+  region: string | null;
   isVerified: boolean;
   kycProvider: string | null;
   kycVerified: boolean;
   kycCheckedAt: string | null;
   birthDate: string | null;
   age: number | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type AuthState = {
@@ -27,25 +28,52 @@ export type AuthState = {
 };
 
 const extractUser = (j: any): User | null => {
-  // 백엔드 응답 형식에 맞춤
-  const userData = j?.data ?? j;
-  if (!userData || typeof userData !== 'object') return null;
-  
-  // 필수 필드 확인
-  if (typeof userData.id !== 'number') return null;
-  
+  const root = j?.data?.user ?? j?.user ?? j?.data ?? j;
+  if (!root || typeof root !== 'object') return null;
+
+  const idSource =
+    root.id ??
+    root.userId ??
+    root.uid ??
+    root.user_id ??
+    (typeof root === 'object' && 'id' in root ? (root as any).id : undefined);
+
+  if (idSource === undefined || idSource === null) return null;
+
+  const id = String(idSource);
+  const createdAt = root.createdAt ?? root.created_at ?? null;
+  const updatedAt = root.updatedAt ?? root.updated_at ?? null;
+
+  const ageRaw = root.age ?? null;
+  const age = typeof ageRaw === 'number' ? ageRaw : ageRaw ? Number(ageRaw) : null;
+
+  const profile = root.profile ?? {};
+
   return {
-    id: userData.id,
-    phone: userData.phone ?? '',
-    nickname: userData.nickname ?? null,
-    isVerified: userData.isVerified ?? false,
-    kycProvider: userData.kycProvider ?? null,
-    kycVerified: userData.kycVerified ?? false,
-    kycCheckedAt: userData.kycCheckedAt ?? null,
-    birthDate: userData.birthDate ?? null,
-    age: userData.age ?? null,
-    createdAt: userData.createdAt ?? new Date().toISOString(),
-    updatedAt: userData.updatedAt ?? new Date().toISOString(),
+    id,
+    phone:
+      root.phone ??
+      root.phoneE164 ??
+      root.phone_e164_norm ??
+      profile.phone ??
+      profile.phoneE164 ??
+      profile.phone_e164_norm ??
+      '',
+    nickname: root.nickname ?? profile.nickname ?? null,
+    region:
+      root.region ??
+      root.regionName ??
+      profile.region ??
+      profile.regionName ??
+      (root.region?.label ?? root.region?.name ?? null),
+    isVerified: root.isVerified ?? root.is_verified ?? profile.isVerified ?? false,
+    kycProvider: root.kycProvider ?? root.kyc_provider ?? profile.kycProvider ?? null,
+    kycVerified: root.kycVerified ?? root.kyc_verified ?? profile.kycVerified ?? false,
+    kycCheckedAt: root.kycCheckedAt ?? root.kyc_checked_at ?? profile.kycCheckedAt ?? null,
+    birthDate: root.birthDate ?? root.birth_date ?? profile.birthDate ?? null,
+    age,
+    createdAt: createdAt ? String(createdAt) : profile.createdAt ? String(profile.createdAt) : null,
+    updatedAt: updatedAt ? String(updatedAt) : profile.updatedAt ? String(profile.updatedAt) : null,
   };
 };
 
@@ -93,6 +121,7 @@ export const useAuthStore = create<AuthState>((set: (state: Partial<AuthState>) 
 
 // 기존 alias 호환
 export const useAuth = useAuthStore;
+export const normalizeUser = extractUser;
 
 // 인증 관련 API 함수들 - 백엔드 직접 호출로 통일
 export async function sendSms(phone: string) {

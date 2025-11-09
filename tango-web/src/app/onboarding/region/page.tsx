@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useAuthStore, normalizeUser } from "@/store/auth";
 import LocationAutocompleteV2 from "@/components/LocationAutocompleteV2";
 import { API_BASE } from "@/lib/api";
 
@@ -17,6 +18,7 @@ export default function RegionPage(){
   const [selectedLocation, setSelectedLocation] = useState<LocationValue | null>(null);
   const [manualInput, setManualInput] = useState(""); // 🆕 테스트 모드용 수동 입력
   const [msg, setMsg] = useState("");
+  const setUser = useAuthStore(s => s.setUser);
 
   const onSave = async () => {
     // 🆕 테스트 모드: 수동 입력이 있으면 사용, 없으면 선택된 지역 사용
@@ -28,7 +30,6 @@ export default function RegionPage(){
         name: manualInput.trim(),
         lat: 37.5665, // 서울 기본 좌표 (테스트용)
         lng: 126.9780,
-        regionCode: undefined
       };
       console.log(`[region] 테스트 모드: 수동 입력 사용`, regionToSave);
     }
@@ -109,6 +110,10 @@ export default function RegionPage(){
       console.log("[region] 회원가입 완료 응답:", signupData);
       
       if (signupData.success) {
+        const normalized = normalizeUser(signupData);
+        if (normalized) {
+          setUser(normalized);
+        }
         // 회원가입 성공 - 세션 정리
         window.sessionStorage.removeItem("phone");
         window.sessionStorage.removeItem("carrier");

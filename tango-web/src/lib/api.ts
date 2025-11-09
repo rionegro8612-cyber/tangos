@@ -164,16 +164,26 @@ export async function apiFetch<T = unknown>(
 
 // ================= Auth =================
 
-export async function sendSms(phone: string, opts?: { dev?: boolean }) {
+export async function sendSms(
+  phone: string,
+  opts?: { dev?: boolean; context?: string; carrier?: string },
+) {
   // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
-  const url = `${API_BASE}/auth/send-sms`;
+  const url = `${API_BASE}/auth/send-sms${opts?.dev ? "?dev=1" : ""}`;
   console.log(`[DEBUG] sendSms URL: ${url}`);
   console.log(`[DEBUG] API_BASE: ${API_BASE}`);
+  const context = opts?.context ?? "register";
+  const carrier = opts?.carrier ?? "LG";
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, carrier: "LG", context: "register", ...(opts?.dev ? { dev: true } : {}) }),
+    body: JSON.stringify({
+      phone,
+      carrier,
+      context,
+      ...(opts?.dev ? { dev: true } : {}),
+    }),
   });
   
   if (!res.ok) {
@@ -184,13 +194,18 @@ export async function sendSms(phone: string, opts?: { dev?: boolean }) {
   return json;
 }
 
-export async function verifyCode(phone: string, code: string) {
+export async function verifyCode(
+  phone: string,
+  code: string,
+  opts?: { context?: string },
+) {
   // ✅ 백엔드 서버로 직접 요청 (BFF 우회)
+  const context = opts?.context ?? "register";
   const res = await fetch(`${API_BASE}/auth/verify-code`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, code, context: "register" }),
+    body: JSON.stringify({ phone, code, context }),
   });
   
   if (!res.ok) {

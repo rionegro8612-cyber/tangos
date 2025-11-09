@@ -39,32 +39,51 @@ export default function ProfilePage() {
       
       setMeLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          credentials: 'include',
-          signal: ctl.signal,
-        });
+        const loadProfile = async (allowRetry = true): Promise<boolean> => {
+          const res = await fetch(`${API_BASE}/auth/me`, {
+            credentials: 'include',
+            signal: ctl.signal,
+          });
 
-        if (!alive) return;
+          if (!alive) return false;
 
-        if (!res.ok) {
-          // 401이면 로그인 페이지로, 다른 에러면 콘솔에 로그
-          if (res.status === 401) {
-            router.replace('/login');
+          if (res.ok) {
+            const text = await res.text();
+            const json: AnyJson = text ? JSON.parse(text) : null;
+            const u = pickUser(json);
+            if (u) {
+              setUser(u);
+              return true;
+            }
+            console.error('User data not found in response:', json);
+            return false;
+          }
+
+          if (res.status === 401 && allowRetry) {
+            try {
+              const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+                signal: ctl.signal,
+              });
+
+              if (refreshRes.ok) {
+                return await loadProfile(false);
+              }
+            } catch (refreshError) {
+              if (alive) {
+                console.error('Refresh failed:', refreshError);
+              }
+            }
           } else {
             console.error('Profile fetch failed:', res.status, res.statusText);
           }
-          return;
-        }
 
-        // JSON 파싱 실패 케이스 방지
-        const text = await res.text();
-        const json: AnyJson = text ? JSON.parse(text) : null;
+          return false;
+        };
 
-        const u = pickUser(json);
-        if (u) {
-          setUser(u);
-        } else {
-          console.error('User data not found in response:', json);
+        const ok = await loadProfile();
+        if (!ok && alive) {
           router.replace('/login');
         }
       } catch (error) {
@@ -126,16 +145,20 @@ export default function ProfilePage() {
             <span className="text-gray-500">ID</span> : <b>{user.id}</b>
           </div>
           <div>
-            <span className="text-gray-500">전화번호</span> :{' '}
-            <b>{user.phone ?? '-'}</b>
+            <span className="text-gray-500">전화번호</span> :{" "}
+            <b>{user.phone || "-"}</b>
           </div>
           <div>
-            <span className="text-gray-500">닉네임</span> :{' '}
-            <b>{user.nickname ?? '-'}</b>
+            <span className="text-gray-500">닉네임</span> :{" "}
+            <b>{user.nickname || "-"}</b>
           </div>
           <div>
-            <span className="text-gray-500">가입일</span> :{' '}
-            <b>{user.createdAt ?? '-'}</b>
+            <span className="text-gray-500">활동 지역</span> :{" "}
+            <b>{user.region || "-"}</b>
+          </div>
+          <div>
+            <span className="text-gray-500">가입일</span> :{" "}
+            <b>{user.createdAt ? new Date(user.createdAt).toLocaleString() : "-"}</b>
           </div>
         </div>
       ) : (
