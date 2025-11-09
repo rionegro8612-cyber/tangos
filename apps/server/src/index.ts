@@ -9,9 +9,23 @@ if (process.env.NODE_ENV !== "test") {
 
   (async () => {
     try {
-      // Redis 연결 보장 - 실패 시 서버 시작 중단
-      await assertRedisReady();
-      console.log("✅ Redis connection verified");
+      // Redis 연결 시도 (개발 환경에서는 선택적)
+      const isDev = process.env.NODE_ENV === "development";
+      const redisOptional = process.env.REDIS_OPTIONAL === "true" || isDev;
+      
+      try {
+        await assertRedisReady();
+        console.log("✅ Redis connection verified");
+      } catch (redisError) {
+        if (redisOptional) {
+          console.warn("⚠️ Redis connection failed, but continuing in development mode");
+          console.warn("   Some features (OTP, sessions) may not work without Redis");
+          console.warn("   To fix: Start Redis locally or set REDIS_URL in .env");
+        } else {
+          console.error("🚫 Redis not ready. Abort start.", redisError);
+          process.exit(1);
+        }
+      }
       
       app.listen(port, () => {
         console.log(`[server] listening on http://localhost:${port}`);
@@ -19,7 +33,7 @@ if (process.env.NODE_ENV !== "test") {
         setupCleanupScheduler();
       });
     } catch (e) {
-      console.error("🚫 Redis not ready. Abort start.", e);
+      console.error("🚫 Server start failed:", e);
       process.exit(1);
     }
   })();

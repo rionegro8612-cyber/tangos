@@ -29,6 +29,8 @@ async function ensureBucketExists() {
     }
   } catch (error) {
     console.error('❌ MinIO bucket setup failed:', error);
+    console.warn('⚠️ File upload features may not work without MinIO');
+    console.warn('   To fix: Start MinIO locally or set MINIO_* env variables');
   }
 }
 

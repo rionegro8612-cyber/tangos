@@ -30,6 +30,11 @@ const otpKey = (phoneE164: string, context = "register") => {
 const cdKey  = (phoneE164: string, context = "register") =>
   `${CD_PREFIX}:${context}:${normalizePhone(phoneE164)}`;
 
+// 쿨다운 키 생성 함수 export (다른 모듈에서 사용)
+export function getCooldownKey(phoneE164: string, context = "register"): string {
+  return cdKey(phoneE164, context);
+}
+
 export async function issueOtp(phoneE164: string, code: string, context = "register") {
   try {
     const r = getRedis();

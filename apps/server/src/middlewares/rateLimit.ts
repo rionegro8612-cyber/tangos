@@ -87,30 +87,9 @@ export const rateLimitSend = async (req: Request, res: Response, next: NextFunct
       );
     }
 
-    // 쿨다운 체크 (재전송 방지)
-    const cooldownKey = `cooldown:send:phone:${phone}`;
-    const redisClient = await ensureRedis();
-    const cooldown = await redisClient.get(cooldownKey);
-
-    if (cooldown) {
-      const cooldownTime = Number(cooldown);
-      const remainingCooldown = Math.ceil((cooldownTime + RATE_LIMITS.send.cooldown * 1000 - Date.now()) / 1000);
-      
-      if (remainingCooldown > 0) {
-        return next(
-          new AppError(
-            ErrorCodes.SMS_RESEND_BLOCKED,
-            429,
-            "재전송 쿨다운 중입니다.",
-            { retryAfter: remainingCooldown },
-          ),
-        );
-      }
-    }
-
-    // 쿨다운 설정 (현재 시간을 저장)
-    await redisClient.setex(cooldownKey, RATE_LIMITS.send.cooldown, Date.now().toString());
-
+    // 🆕 쿨다운 체크는 auth.mvp.ts에서 처리 (첫 요청/재전송 구분)
+    // 여기서는 레이트 리밋만 체크하고 쿨다운은 건너뜀
+    
     next();
   } catch (error) {
     console.error("Rate limit check failed:", error);

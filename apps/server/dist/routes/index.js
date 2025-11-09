@@ -32,12 +32,12 @@ exports.router.use("/auth/register", register_submit_1.default);
 exports.router.use("/community", community_1.default);
 // Upload (MinIO 파일 업로드)
 exports.router.use("/upload", upload_1.default);
-// 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함)
-exports.router.use("/", compat_v1_1.default);
 // KYC (PASS/NICE 등)
 exports.router.use("/auth", kyc_mvp_1.default);
 // User (프로필 등)
 exports.router.use("/user", user_1.default);
 // Profile (닉네임, 지역 등)
 exports.router.use("/profile", profile_1.default);
+// 호환성 프록시 라우터 (compat.v1.ts의 /auth/register/* 포함) - 마지막에 위치
+exports.router.use("/", compat_v1_1.default);
 exports.default = exports.router;
