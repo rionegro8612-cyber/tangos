@@ -1,10 +1,10 @@
 // tango-web/src/lib/api.ts
 
 // 통일된 API_BASE 설정 (백엔드 서버 직접 호출)
-export const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || 
-  "http://localhost:4100"
-).replace(/\/+$/, "") + "/api/v1";
+const rawApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
+const normalizedApiBase = rawApiBase ? rawApiBase.replace(/\/+$/, "") : "";
+
+export const API_BASE = normalizedApiBase ? `${normalizedApiBase}/api/v1` : "/api/v1";
 
 // 기존 API_BASE (하위 호환성 유지) - 현재 사용되지 않음
 // const API_BASE_LEGACY = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
@@ -173,7 +173,7 @@ export async function sendSms(phone: string, opts?: { dev?: boolean }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, carrier: "LG", context: "signup", ...(opts?.dev ? { dev: true } : {}) }),
+    body: JSON.stringify({ phone, carrier: "LG", context: "register", ...(opts?.dev ? { dev: true } : {}) }),
   });
   
   if (!res.ok) {
@@ -190,7 +190,7 @@ export async function verifyCode(phone: string, code: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, code, context: "signup" }),
+    body: JSON.stringify({ phone, code, context: "register" }),
   });
   
   if (!res.ok) {
@@ -207,7 +207,7 @@ export async function signup(phone: string, code: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: 'include',
-    body: JSON.stringify({ phone, code, context: "signup" }),
+    body: JSON.stringify({ phone, code, context: "register" }),
   });
   
   if (!res.ok) {

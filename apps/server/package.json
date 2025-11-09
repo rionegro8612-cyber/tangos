@@ -13,6 +13,7 @@
     "start": "dotenv -e ./.env --overload -- node dist/index.js",
     "start:prod": "dotenv -e ./.env.prod -- node dist/index.js",
     "start:staging": "dotenv -e ./.env.staging -- node dist/index.js",
+    "reset:otp": "tsx scripts/dev/reset-otp.ts",
     "build:ci": "tsc",
     "test:security": "node scripts/test-security.js",
     "test:security:prod": "NODE_ENV=production node scripts/test-security.js",

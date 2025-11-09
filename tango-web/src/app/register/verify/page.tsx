@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:4100"; // 호스트만
+import { API_BASE } from "@/lib/api";
 
 // 전화번호는 이미 +82 형식으로 저장되어 있음
 
@@ -53,20 +52,21 @@ export default function RegisterVerifyPage() {
       console.warn("[sendOtp] missing phone/carrier → skip");
       return;
     }
-    if (!API_BASE) {
-      alert("환경변수 NEXT_PUBLIC_API_BASE가 비어 있습니다.");
-      return;
-    }
 
     setBusy(true);
     setMsg("");
 
          try {
        // 전화번호는 이미 +82 형식으로 저장되어 있음
-       const r = await fetch(`${API_BASE}/auth/send-sms`, {
+       // 개발 환경에서는 dev 파라미터 추가하여 devCode 표시
+       const isDev = process.env.NODE_ENV !== "production";
+       const url = `${API_BASE}/auth/send-sms${isDev ? "?dev=1" : ""}`;
+       console.log(`[sendOtp] 요청 URL: ${url}, isDev: ${isDev}`);
+       
+       const r = await fetch(url, {
          method: "POST",
          headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ phone, carrier, context: "signup" }),
+         body: JSON.stringify({ phone, carrier, context: "register" }),
          credentials: "include",
        });
 
@@ -159,7 +159,7 @@ export default function RegisterVerifyPage() {
              const verifyBody = {
         phone,
         code,
-        context: "signup"
+        context: "register"
       };
       console.log("[verify-code request]", verifyBody);
       
@@ -184,110 +184,41 @@ export default function RegisterVerifyPage() {
        if (data.success) {
          console.log("[verify-code success]", data);
          
-                   // 🚨 기존 회원 vs 신규 회원 분기 처리
-          // 현재 응답에서 code가 "LOGIN_OK"인 경우 기존 회원으로 처리
-          if (data.code === 'LOGIN_OK' || data.message === 'LOGIN_OK') {
-            console.log("[verify-code] 기존 회원 로그인 완료:", data);
-            setMsg("축하합니다! 회원가입이 완료되었습니다.");
-            
-            // 기존 회원: 토큰이 있다면 저장하고 홈으로 이동
-            if (data.data?.accessToken) {
-              window.sessionStorage.setItem("accessToken", data.data.accessToken);
-            }
-            if (data.data?.refreshToken) {
-              window.sessionStorage.setItem("refreshToken", data.data.refreshToken);
-            }
-            
-            // 잠시 후 홈으로 이동
-            setTimeout(() => {
-              router.replace("/");
-            }, 2000);
-            return;
-          }
-         
-         console.log("[verify-code] 신규 회원 또는 검증 완료, 회원가입 진행");
-         
-         // 2단계: 회원가입 정보 전송 (신규 회원만)
-         try {
-                                // 🚨 가입 요청 직전 전화번호 E.164 통일 확인
-           console.log("[REGISTER payload phone]", {
-             raw: phone,
-             type: typeof phone,
-             startsWith82: phone?.startsWith('+82'),
-             length: phone?.length
-           });
+         // 🚨 기존 회원 vs 신규 회원 분기 처리
+         // 기존 회원인 경우: 로그인 완료 후 홈으로 이동
+         if (data.code === 'LOGIN_OK' || data.message === 'LOGIN_OK' || !data.data?.isNew) {
+           console.log("[verify-code] 기존 회원 로그인 완료:", data);
+           setMsg("로그인되었습니다.");
            
-           // 🚨 백엔드 API 스펙에 맞게 데이터 변환
-           const birthYear = new Date(birth).getFullYear();
+           // 기존 회원: 토큰이 있다면 저장하고 홈으로 이동
+           if (data.data?.accessToken) {
+             window.sessionStorage.setItem("accessToken", data.data.accessToken);
+           }
+           if (data.data?.refreshToken) {
+             window.sessionStorage.setItem("refreshToken", data.data.refreshToken);
+           }
            
-           const signupBody = {
-             phone,                      // 🚨 세션에서 찾을 수 없으므로 직접 전송
-             profile: {
-               nickname: name,           // name → nickname
-               region: "서울",           // 기본값 (나중에 선택 가능)
-               birthYear: birthYear      // YYYY-MM-DD → YYYY
-             },
-             agreements: [
-               {
-                 code: "TOS",           // key → code
-                 version: "1.0",
-                 required: true,
-                 accepted: terms.tos
-               },
-               {
-                 code: "PRIVACY",       // key → code
-                 version: "1.0", 
-                 required: true,
-                 accepted: terms.privacy
-               }
-             ]
-           };
-           console.log("[signup request]", signupBody);
-           console.log("[signup request] phone check:", {
-             phoneInBody: signupBody.phone,
-             phoneType: typeof signupBody.phone,
-             phoneLength: signupBody.phone?.length
-           });
-          
-                     const signupResponse = await fetch(`${API_BASE}/auth/register/submit`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(signupBody)
-          });
-          
-          if (!signupResponse.ok) {
-            const text = await signupResponse.text().catch(() => "");
-            const errorMsg = `회원가입 실패: HTTP ${signupResponse.status} ${signupResponse.statusText} :: ${text}`;
-            console.error("[signup failed]", errorMsg);
-            setMsg(errorMsg);
-            return;
-          }
-          
-          const signupData = await signupResponse.json();
-          console.log("[signup response]", signupData);
-          
-          if (signupData.success) {
-            // 회원가입 성공 - 세션 정보 저장
-            if (signupData.data?.accessToken) {
-              window.sessionStorage.setItem("accessToken", signupData.data.accessToken);
-            }
-            if (signupData.data?.refreshToken) {
-              window.sessionStorage.setItem("refreshToken", signupData.data.refreshToken);
-            }
-            
-            // 🚨 phoneVerified 세션 설정 (onboarding 페이지에서 필요)
-            window.sessionStorage.setItem("phoneVerified", "true");
-            
-            // 회원가입 완료 후 온보딩으로 이동
-            router.push("/onboarding");
-          } else {
-            setMsg(signupData.message || "회원가입에 실패했습니다.");
-          }
-        } catch (error) {
-          console.error("[signup exception]", error);
-          setMsg("회원가입 중 오류가 발생했습니다.");
-        }
+           // 잠시 후 홈으로 이동
+           setTimeout(() => {
+             router.replace("/");
+           }, 2000);
+           return;
+         }
+         
+         // 🆕 신규 회원인 경우: OTP 검증만 완료하고 닉네임 설정 페이지로 이동
+         console.log("[verify-code] 신규 회원 OTP 검증 완료, 닉네임 설정으로 이동");
+         
+         // 전화번호 인증 완료 표시를 sessionStorage에 저장
+         window.sessionStorage.setItem("phoneVerified", "true");
+         
+         // 회원가입 정보도 sessionStorage에 저장 (닉네임/지역 설정 후 사용)
+         window.sessionStorage.setItem("name", name);
+         window.sessionStorage.setItem("birth", birth);
+         window.sessionStorage.setItem("gender", gender);
+         window.sessionStorage.setItem("terms", JSON.stringify(terms));
+         
+         // 닉네임 설정 페이지로 이동
+         router.push("/onboarding/nickname");
       } else {
         setMsg(data.message || "인증번호가 올바르지 않습니다.");
       }

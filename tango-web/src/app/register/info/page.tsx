@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE!; // 예: http://localhost:4100
+import { API_BASE } from "@/lib/api";
 
 export default function RegisterInfoPage(){
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -61,11 +60,6 @@ export default function RegisterInfoPage(){
       return;
     }
 
-    if (!API_BASE) {
-      alert("환경변수 NEXT_PUBLIC_API_BASE가 비어 있습니다.");
-      return;
-    }
-
     setSending(true);
     setMsg("");
 
@@ -78,7 +72,7 @@ export default function RegisterInfoPage(){
         body: JSON.stringify({
           phone,
           carrier,
-          context: "signup"
+          context: "register"
         })
       });
 

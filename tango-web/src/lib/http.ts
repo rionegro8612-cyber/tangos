@@ -1,6 +1,8 @@
 // tango-web/src/lib/http.ts
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4100";
+import { API_BASE } from "./api";
+
+const BASE = API_BASE;
 
 // 표준 응답 타입
 export type StandardResponse<T = unknown> = {

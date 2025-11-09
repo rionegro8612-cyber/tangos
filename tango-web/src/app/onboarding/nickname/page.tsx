@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/auth";
+import { API_BASE } from "@/lib/api";
 
 async function checkNickname(value: string, userId?: string){
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
   const url = userId 
-    ? `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}&userId=${encodeURIComponent(userId)}`
-    : `${base}/api/v1/profile/nickname/check?value=${encodeURIComponent(value)}`;
+    ? `${API_BASE}/profile/nickname/check?value=${encodeURIComponent(value)}&userId=${encodeURIComponent(userId)}`
+    : `${API_BASE}/profile/nickname/check?value=${encodeURIComponent(value)}`;
   
   const res = await fetch(url, {
     credentials: "include"
@@ -50,21 +50,15 @@ export default function NicknamePage(){
     if (!canNext) return;
     
     try {
-      const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:4100";
-      const res = await fetch(`${base}/api/v1/profile/nickname`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: value })
-      });
+      // 🆕 회원가입 중이므로 닉네임을 sessionStorage에 저장
+      // (회원가입 완료 시 함께 제출)
+      window.sessionStorage.setItem("nickname", value);
+      console.log(`[nickname] 닉네임 저장: ${value}`);
       
-      const j = await res.json();
-      if (j.success) {
-        location.href = "/onboarding/region";
-      } else {
-        setMsg(j.message || "닉네임 저장에 실패했습니다.");
-      }
+      // 지역 설정 페이지로 이동
+      location.href = "/onboarding/region";
     } catch (error) {
+      console.error("[nickname] 오류:", error);
       setMsg("닉네임 저장 중 오류가 발생했습니다.");
     }
   };
